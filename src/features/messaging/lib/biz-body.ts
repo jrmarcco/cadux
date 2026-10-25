@@ -8,6 +8,10 @@ export interface BizBody {
   destinationType?: string
   content?: string
   contentType?: string
+  /** 系统回执 ( 新契约 §5 ): send_failed 等 */
+  systemType?: string
+  reason?: string
+  upstreamId?: string
 }
 
 /**
@@ -68,16 +72,18 @@ export function toChatMessage(
 ) {
   const biz = decodeBizBody(inbox.body)
   const sentAtMs = Number.isFinite(Date.parse(inbox.sentAt)) ? Date.parse(inbox.sentAt) : Date.now()
+  const isSystem = typeof biz.systemType === 'string' && biz.systemType.length > 0
   return {
     id: inbox.messageId,
-    localId: typeof biz.id === 'string' && biz.id.length > 0 ? biz.id : null,
+    localId: !isSystem && typeof biz.id === 'string' && biz.id.length > 0 ? biz.id : null,
     conversationKey,
     // protojson 将 int64 senderId 序列化为字符串, 统一收敛为十进制字符串
     senderId: String(inbox.senderId),
     content: typeof biz.content === 'string' ? biz.content : '',
-    contentType: biz.contentType === 'image' ? ('image' as const) : ('text' as const),
+    contentType: isSystem ? ('system' as const) : biz.contentType === 'image' ? ('image' as const) : ('text' as const),
     sentAtMs,
-    status: 'sent' as const
+    status: 'sent' as const,
+    systemUpstreamId: isSystem && typeof biz.upstreamId === 'string' ? biz.upstreamId : undefined
   }
 }
 

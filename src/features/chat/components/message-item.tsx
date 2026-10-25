@@ -13,6 +13,15 @@ export interface MessageItemProps {
 }
 
 export function MessageItem({ message, isSelf, senderName, showNickname, avatarSize, onResend }: MessageItemProps) {
+  // 系统回执 ( send_failed 等 ): 居中灰字提示, 不占气泡位
+  if (message.contentType === 'system') {
+    return (
+      <div className={styles.systemNotice} title={formatTime(message.sentAtMs)}>
+        {message.content}
+      </div>
+    )
+  }
+
   return (
     <div className={[styles.messageRow, isSelf ? styles.messageRowSelf : ''].join(' ')}>
       <Avatar name={senderName} size={avatarSize} />

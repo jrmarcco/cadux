@@ -1,10 +1,32 @@
 # 后端服务问题清单 ( hermet / synp )
 
-> 记录时间: 2026-10-25 · 验证方式: cadux 桌面客户端 E2E + `scripts/ws-smoke.mjs` 协议冒烟
+> 首轮记录: 2026-10-25 22:29 · 复测: 2026-10-25 23:52 ( 后端修复重新部署后 )
+> 验证方式: cadux 桌面客户端 E2E + `scripts/ws-smoke.mjs` / `scripts/ws-verify-fixed.mjs`
 > 所有问题均已在本地部署 ( hermet:10081 / synp:10071 ) 复现并留有证据;
 > 客户端侧规避实现见 `src/shared/lib/lossless-json.ts` 与 `src/features/messaging/`。
+> 复测**新发现**的问题见 [backend-issues-2610252352.md](./backend-issues-2610252352.md)。
 
-## 严重 ( 已在客户端做规避 )
+## 复测结果 ( 2026-10-25 23:52, 新契约验证 16/16 通过 )
+
+首轮 13 项中 **12 项已确认修复**, B-7 为新写入已修复 + 存量不回填 ( 见文末 S-1 )。
+
+| #    | 问题                                                  | 状态                                                      | 复测证据                                                                                               |
+| ---- | ----------------------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| B-1  | HTTP/JWT int64 以 JSON number 下发, JS 精度损坏       | ✅ 已修复                                                 | JWT `user_id` 为字符串 ( `"240070963854417920"` ); contacts/channels 全部 ID 带引号                    |
+| B-2  | UPSTREAM destinationId 传字符串被静默丢弃             | ✅ 已修复                                                 | 字符串与数字字面量两种形态均可投递落库                                                                 |
+| B-3  | 落库 body 为纯文本 content, 非 body 原文              | ✅ 已修复                                                 | 回显 body 为原文 JSON, 业务 `id`/`contentType` 完整, 数字/字符串形态原样保留                           |
+| B-4  | 落库 message_id = 帧 messageId 未在文档说明           | ✅ 已修复 ( 文档 §7 显式声明 )                            | 回显 messageId = 帧 ID, 与文档一致                                                                     |
+| B-5  | 业务级失败静默丢弃, 无回执                            | ✅ 已修复                                                 | 失败产生 `systemType: "send_failed"` 系统条目, 经 SYNC 送达, 含 `upstreamId` 可关联 pending            |
+| B-6  | CORS 预检 ( OPTIONS ) 被 401 拦截                     | ✅ 已修复                                                 | OPTIONS 返回 204 + `access-control-allow-origin: http://localhost:5173`                                |
+| B-7  | 群 channel CDC 部分成员缺 channel 行                  | ✅ 新写入已修复 ( 存量见 S-1 )                            | 新建群 `240138057232138240` A/B 双方 channels 均含该群行                                               |
+| B-8  | 下行帧为二进制帧 ( Blob 投递 )                        | ✅ 已修复                                                 | 下行帧为 text 帧 ( string )                                                                            |
+| B-9  | 顶号瞬间新连接 AUTH_ACK 可能丢失                      | ✅ 已知行为 ( 文档 §13 声明尽力而为, 重复 AUTH 幂等兜底 ) | —                                                                                                      |
+| B-10 | protojson 省略 false 值 / errorMessage 泄漏 gRPC 文本 | ✅ 已修复                                                 | `hasMore`/`cursorExpired`/`isSuccess`/空 `errorMessage` 照常输出; 失败文本不再含 `rpc error: code=...` |
+| B-11 | NOTIFY.messageId 复用触发消息的 UPSTREAM 帧 ID        | ✅ 已修复                                                 | NOTIFY messageId 为服务端独立生成的 32 位 hex                                                          |
+| B-12 | 存量纯文本 body                                       | ✅ 已知行为 ( 文档 §13 声明存量兼容 )                     | —                                                                                                      |
+| B-13 | admin/user 500 泄漏 SQL 内部细节                      | ✅ 已修复                                                 | 缺参返回 400 + `invalid param: email or mobile is required`, 无 SQL/约束名                             |
+
+## 首轮详细记录 ( 2026-10-25 22:29, 修复前 )
 
 ### B-1 hermet: HTTP / JWT 将 int64 ID 序列化为 JSON 数字, JS 客户端精度损坏
 
@@ -13,7 +35,6 @@
 - **后果**: 以损坏 ID 作为 destinationId 发消息被服务端判定"非联系人"**静默丢弃**
   ( hermet 日志: `single chat validation failed ... receiver_id=134605228232032260 ... are not contacts` );
   联系人 ID 展示错误; 会话 key 与服务端不一致。
-- **证据**: 2026-10-25 hermet 日志 `WARN message-service single chat validation failed` × 多次。
 - **建议**: 与 WS 链路一致, 全部 int64 以字符串序列化 ( protojson 风格 )。
 - **客户端规避**: `parseJsonLossless` ( ≥16 位整数字面量解析为字符串 )、JWT 用正则无损提取、
   全链路 ID 以十进制字符串承载。
@@ -40,8 +61,6 @@
 - **现象**: 回显消息的 `messageId` 即发送端网关帧的 ULID; body.id 与落库 ID 无关。
 - **文档未说明**; 前端多端合并策略必须依赖此行为 ( 见 B-3 规避 )。建议在文档中显式声明。
 
-## 中等
-
 ### B-5 业务级失败静默丢弃, 无任何客户端可见回执
 
 - 非好友 / 目标用户不存在 / body 反序列化失败 ( `json: cannot unmarshal string ...` ) 的 UPSTREAM
@@ -58,8 +77,6 @@
 - 同一群聊 `g:240079435428384768`: A 的 `channels` 有 channel 行 ( channelName=e2e-group-fixed ),
   B 的 `channels` 无该行, B 侧只能靠收件箱 fallback 生成 `群聊 240079435428384768` 占位会话。
 - 双账号 channels 响应对比可复现 ( 2026-10-25 )。
-
-## 轻微 ( 文档差异 / 协议体验 )
 
 ### B-8 synp: 下行帧为二进制帧 ( payload 是 JSON 文本 )
 
@@ -81,7 +98,7 @@
 ### B-11 synp: NOTIFY 帧 messageId 复用触发消息的 UPSTREAM 帧 ID
 
 - 不符合"帧唯一 ID"语义, 客户端不能以 NOTIFY.messageId 做帧关联; 另 NOTIFY 重复下发常见
-  ( 单条消息两端各收到 2 条 ), 按 latestSeq 比较可免疫。
+  ( 单条消息两端各 2 条 ), 按 latestSeq 比较可免疫。
 
 ### B-12 历史数据: 非 JSON 纯文本 body 透传入库
 
@@ -93,3 +110,13 @@
 - `POST /api/v1/admin/user` 缺 `gender` 时返回 HTTP 500 + 原始 SQL 错误文本
   ( `violates check constraint "chk_gender_0" (SQLSTATE 23514)` ), 泄漏表结构与约束命名;
   且错误信封使用 `msg` 字段而非 `message` ( 与文档 §3 一致但与正常信封不一致 )。
+
+## 存量数据说明
+
+### S-1 修复前创建的群: 错误分片的 channel 行仍在原处 ( B-7 复测补充 )
+
+- B-7 修复只影响**新写入**; 修复前创建的群 ( 如 `g:240079435428384768` / e2e-group-fixed )
+  的 channel 行仍落在错误分片: **A 侧有 channel 行, B 侧没有** ( 2026-10-25 23:52 复测再次确认 )。
+- 影响: B 端该群在会话列表只能以收件箱 fallback 生成 `群聊 240079435428384768` 占位
+  ( 无群名/头像 ); 消息收发不受影响 ( 走收件箱/timeline )。
+- 处置建议: 一次性回填脚本按新分片规则迁移存量 channel 行, 或接受占位展示。

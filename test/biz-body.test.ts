@@ -112,4 +112,37 @@ describe('toChatMessage ( int64 senderId )', () => {
     expect(message.localId).toBe('local-1')
     expect(message.status).toBe('sent')
   })
+
+  it('send_failed 系统回执识别为 system 类型并携带 upstreamId', () => {
+    const body = toBase64(
+      JSON.stringify({
+        systemType: 'send_failed',
+        reason: 'not_allowed',
+        upstreamId: '01FRAME',
+        content: '消息发送失败: 对方不是你的联系人或你不是群成员'
+      })
+    )
+    const message = toChatMessage(
+      { messageId: '01FRAME', senderId: '240070963854417920', body, sentAt: '2026-10-25T10:00:00Z' },
+      's:1:2'
+    )
+    expect(message.contentType).toBe('system')
+    expect(message.systemUpstreamId).toBe('01FRAME')
+    expect(message.localId).toBeNull()
+    expect(message.content).toContain('消息发送失败')
+  })
+
+  it('普通消息不受系统字段影响', () => {
+    const message = toChatMessage(
+      {
+        messageId: 'm2',
+        senderId: '10001',
+        body: toBase64(JSON.stringify({ id: 'local-2', content: 'hi', contentType: 'text' })),
+        sentAt: '2026-10-25T10:00:00Z'
+      },
+      's:1:2'
+    )
+    expect(message.contentType).toBe('text')
+    expect(message.systemUpstreamId).toBeUndefined()
+  })
 })

@@ -78,18 +78,46 @@ export function startMessaging(): void {
         }
       },
       onInboxMessage: (inbox) => {
-        const message = toChatMessage(inbox, normalizeConversationKey(inbox.conversationId))
         const store = useMessagingStore.getState()
-        // hermet 落库 message_id = UPSTREAM 帧 ID: 命中说明是自身回显, 借此与 pending 合并
-        const bizId = store.frameMap[inbox.messageId]
-        if (bizId !== undefined) {
-          message.localId = bizId
-          store.releaseFrame(inbox.messageId)
+
+        // 发送失败回执 ( send_failed ): 按 upstreamId 关联本地 pending, 标记可重试
+        if (inbox.conversationId.length === 0) {
+          // B-14 ( 见 docs/backend-issues-2610252229.md ): invalid_destination 场景
+          // 系统条目 conversationId 为空串, 回落到失败 pending 所在会话
+          const preview = toChatMessage(inbox, '')
+          const bizId = preview.systemUpstreamId ? store.frameMap[preview.systemUpstreamId] : undefined
+          const fallbackKey = bizId !== undefined ? store.pendingMap[bizId] : undefined
+          if (bizId === undefined || fallbackKey === undefined) return
+          preview.conversationKey = fallbackKey
+          store.releaseFrame(preview.systemUpstreamId as string)
+          store.markMessageFailed(bizId)
+          store.applyIncomingMessage(preview, {
+            selfId: currentSelfId(),
+            activeKey: useActiveConversationStore.getState().activeKey,
+            countUnread: false
+          })
+          return
+        }
+
+        const message = toChatMessage(inbox, normalizeConversationKey(inbox.conversationId))
+        if (message.contentType === 'system' && message.systemUpstreamId !== undefined) {
+          const bizId = store.frameMap[message.systemUpstreamId]
+          if (bizId !== undefined) {
+            store.releaseFrame(message.systemUpstreamId)
+            store.markMessageFailed(bizId)
+          }
+        } else {
+          // hermet 落库 message_id = UPSTREAM 帧 ID: 命中说明是自身回显, 借此与 pending 合并
+          const bizId = store.frameMap[inbox.messageId]
+          if (bizId !== undefined) {
+            message.localId = bizId
+            store.releaseFrame(inbox.messageId)
+          }
         }
         store.applyIncomingMessage(message, {
           selfId: currentSelfId(),
           activeKey: useActiveConversationStore.getState().activeKey,
-          countUnread: message.sentAtMs >= liveSinceMs
+          countUnread: message.contentType === 'system' ? false : message.sentAtMs >= liveSinceMs
         })
       },
       onConversationUpdate: (conversationId, latestSeq) => {

@@ -3,28 +3,6 @@
 > 适用版本: synp-api **v0.1.0** 及以上 ( 帧协议契约见 [api 工程](../../api/README.md) )。
 > 文中「网关默认值」按当前部署配置给出, 以实际部署配置为准。
 
-## 0. 实测勘误 ( 2026-10-25, 以本地部署验证为准 )
-
-以下差异已由 cadux 客户端 E2E 实测确认, 与本文其余章节冲突时以本节为准;
-完整后端问题清单见 [backend-issues.md](./backend-issues.md)。
-
-1. **下行帧为二进制帧**: 浏览器 `WebSocket.onmessage` 的 `event.data` 是 **Blob**
-   ( Node 原生 WebSocket 同样 ), payload 内容仍是 §2 所述 JSON 文本。
-   只按字符串处理的客户端会静默丢弃全部下行帧, 表现为 AUTH 永远等不到 ACK。
-2. **protojson int64 → 字符串**: `latestSeq` / `entries[].seq` / `message.senderId` /
-   `conversationLatestSeq` / `timestampMs` 均为字符串; 大 int64 ( 如用户 ID ) 在 JS 中
-   不可安全走 `Number`。
-3. **protojson 省略 false 值**: `hasMore` / `cursorExpired` 为 false 时字段缺失;
-   失败应答 ( 如非群成员 CONVERSATION_SYNC ) 缺省 `isSuccess`, 仅带 `errorMessage`
-   ( 内容为内部 gRPC 错误文本, 如 `failed to conversation sync: rpc error: code = PermissionDenied ...` )。
-4. **NOTIFY 帧 messageId 复用触发它的 UPSTREAM 帧 messageId**, 不是 NOTIFY 自身的唯一 ID;
-   NOTIFY 重复下发常见 ( 单条消息两端各 2 条 ), 客户端按 latestSeq 比较即可免疫。
-5. **UPSTREAM 落库语义**: hermet 以 UPSTREAM **帧 messageId** 作为落库 message_id,
-   且落库 body 为纯文本 `content` ( 非 UPSTREAM body JSON 原文 )——发送端多端合并
-   需以帧 ID 关联, 业务 body 中的 `id`/`contentType` 不会回传。
-6. **UPSTREAM body 的 destinationId 必须是精确数字字面量** ( hermet 侧要求 ):
-   传字符串会被静默丢弃; 大 int64 需以字面量注入方式序列化。
-
 ## 1. 总览
 
 ```
@@ -71,7 +49,8 @@ ws(s)://<gateway-host>:10071?device=<mobile|tablet|pc>
 
 ### 帧格式 ( Message )
 
-所有帧 ( 上行与下行 ) 统一为 JSON 文本, 结构:
+所有帧 ( 上行与下行 ) 统一为 **text 文本帧**, `ev.data` / `onmessage` 收到的
+是 string ( 不是 Blob ), 结构:
 
 ```json
 {
@@ -222,8 +201,10 @@ ws.send(JSON.stringify(upstream))
 **UPSTREAM_ACK 的语义 ( 重要 )**:
 
 - `isSuccess: true` 只表示**网关已接收该帧** ( 已成功投递 Kafka ), 不代表业务处理成功。
-- 业务级失败 ( 如被禁言、非群成员 ) **不会**通过 ACK 表达——后端会将其作为一条
-  系统消息走同步链路下发, 由业务侧定义。
+- 业务级失败 ( 非好友/被屏蔽/非群成员/body 非法 ) **不会**通过 ACK 表达——
+  后端会向发送者自己的收件箱写一条 `contentType: "system"` 的系统条目
+  ( `systemType: "send_failed"`, 含触发帧 `upstreamId` 与展示文案 ),
+  经 NOTIFY → SYNC 同步链路送达。
 - `isSuccess: false` 常见于网关侧故障 ( Kafka 不可用 ), 客户端可原 `messageId` 重试。
 
 **message_id 约定**:
@@ -262,6 +243,10 @@ if (notify.latestSeq > localCursor) {
 
 **通知允许丢失和重复** ( 只影响实时性, 不影响正确性 ):
 丢失的增量靠重连/心跳兜底 ( 见 [重连策略](#10-断线重连) ), 重复靠 `latestSeq` 比对消化。
+
+> NOTIFY 帧的 `messageId` 由服务端**每次下发独立生成** ( 仅用于日志排查 ),
+> 与触发消息的 UPSTREAM 帧 ID 无关——不要用它做帧关联或消息去重,
+> 去重一律按 `latestSeq` / 收件箱 `seq`。
 
 ### SYNC 帧
 
@@ -313,14 +298,19 @@ SYNC_ACK 的 body ( 成功时 ) 解码后:
 
 字段语义:
 
-| 字段                           | 说明                                                                                           |
-| ------------------------------ | ---------------------------------------------------------------------------------------------- |
-| `entries[].seq`                | 该条目在你收件箱中的序号, **严格单调递增**, 以此去重并推进游标                                 |
-| `entries[].message`            | 写扩散条目 ( 单聊/小群 ): 消息本体**内联**在此, 一次拉取即可渲染; `body` 仍是 base64 业务 JSON |
-| `entries[].conversationUpdate` | 读扩散指针 ( 大群 ): 只告诉你该会话有更新, 需再发 `CONVERSATION_SYNC` 拉正文                   |
-| `latestSeq`                    | 服务端收件箱当前最大 seq                                                                       |
-| `hasMore`                      | 为 `true` 时带新游标继续翻页                                                                   |
-| `cursorExpired`                | 为 `true` 表示本地数据早于服务端保留窗口, **应重置本地消息数据后重新全量同步**                 |
+| 字段                           | 说明                                                                                                                                                                 |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `entries[].seq`                | 该条目在你收件箱中的序号, **严格单调递增**, 以此去重并推进游标                                                                                                       |
+| `entries[].message`            | 写扩散条目 ( 单聊/小群 ): 消息本体**内联**在此, 一次拉取即可渲染; `body` 仍是 base64 业务 JSON; `messageId` 为发送端 UPSTREAM **帧 ID** ( 与 body 内业务 `id` 无关 ) |
+| `entries[].conversationUpdate` | 读扩散指针 ( 大群 ): 只告诉你该会话有更新, 需再发 `CONVERSATION_SYNC` 拉正文                                                                                         |
+| `latestSeq`                    | 服务端收件箱当前最大 seq                                                                                                                                             |
+| `hasMore`                      | 为 `true` 时带新游标继续翻页                                                                                                                                         |
+| `cursorExpired`                | 为 `true` 表示本地数据早于服务端保留窗口, **应重置本地消息数据后重新全量同步**                                                                                       |
+
+> `*_ACK` body 中的零值字段**照常输出** ( `isSuccess` / `hasMore` /
+> `cursorExpired` 为 false 时不会缺省 ), 无需为字段缺失做特判。
+> `errorMessage` 只包含面向客户端的文案, 不透出内部实现细节;
+> 未识别的系统错误统一为 `internal error, please retry`。
 
 客户端处理流程:
 

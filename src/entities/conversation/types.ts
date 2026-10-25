@@ -26,7 +26,7 @@ export interface SessionSummary {
   mentionCount: number
 }
 
-export type MessageContentType = 'text' | 'image'
+export type MessageContentType = 'text' | 'image' | 'system'
 export type MessageStatus = 'pending' | 'sent' | 'failed'
 
 /** 渲染层消息 ( 协议无关, 由收件箱 / timeline 条目归一化而来 ) */
@@ -41,6 +41,8 @@ export interface ChatMessage {
   contentType: MessageContentType
   sentAtMs: number
   status: MessageStatus
+  /** send_failed 系统回执关联的 UPSTREAM 帧 ID ( 仅 contentType=system ) */
+  systemUpstreamId?: string
 }
 
 /** UPSTREAM 帧业务 body ( 网关不解释结构, backend 按此读取目的地与内容 ) */
