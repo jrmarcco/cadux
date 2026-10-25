@@ -3,6 +3,28 @@
 > 适用版本: synp-api **v0.1.0** 及以上 ( 帧协议契约见 [api 工程](../../api/README.md) )。
 > 文中「网关默认值」按当前部署配置给出, 以实际部署配置为准。
 
+## 0. 实测勘误 ( 2026-10-25, 以本地部署验证为准 )
+
+以下差异已由 cadux 客户端 E2E 实测确认, 与本文其余章节冲突时以本节为准;
+完整后端问题清单见 [backend-issues.md](./backend-issues.md)。
+
+1. **下行帧为二进制帧**: 浏览器 `WebSocket.onmessage` 的 `event.data` 是 **Blob**
+   ( Node 原生 WebSocket 同样 ), payload 内容仍是 §2 所述 JSON 文本。
+   只按字符串处理的客户端会静默丢弃全部下行帧, 表现为 AUTH 永远等不到 ACK。
+2. **protojson int64 → 字符串**: `latestSeq` / `entries[].seq` / `message.senderId` /
+   `conversationLatestSeq` / `timestampMs` 均为字符串; 大 int64 ( 如用户 ID ) 在 JS 中
+   不可安全走 `Number`。
+3. **protojson 省略 false 值**: `hasMore` / `cursorExpired` 为 false 时字段缺失;
+   失败应答 ( 如非群成员 CONVERSATION_SYNC ) 缺省 `isSuccess`, 仅带 `errorMessage`
+   ( 内容为内部 gRPC 错误文本, 如 `failed to conversation sync: rpc error: code = PermissionDenied ...` )。
+4. **NOTIFY 帧 messageId 复用触发它的 UPSTREAM 帧 messageId**, 不是 NOTIFY 自身的唯一 ID;
+   NOTIFY 重复下发常见 ( 单条消息两端各 2 条 ), 客户端按 latestSeq 比较即可免疫。
+5. **UPSTREAM 落库语义**: hermet 以 UPSTREAM **帧 messageId** 作为落库 message_id,
+   且落库 body 为纯文本 `content` ( 非 UPSTREAM body JSON 原文 )——发送端多端合并
+   需以帧 ID 关联, 业务 body 中的 `id`/`contentType` 不会回传。
+6. **UPSTREAM body 的 destinationId 必须是精确数字字面量** ( hermet 侧要求 ):
+   传字符串会被静默丢弃; 大 int64 需以字面量注入方式序列化。
+
 ## 1. 总览
 
 ```

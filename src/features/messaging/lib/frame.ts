@@ -77,7 +77,8 @@ export interface UpstreamAckPayload {
 export interface InboxMessage {
   conversationId: string
   messageId: string
-  senderId: number
+  /** protojson int64 → 序列化为字符串 */
+  senderId: number | string
   body: string
   sentAt: string
 }

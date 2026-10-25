@@ -3,6 +3,7 @@ export type ChannelType = 'single' | 'group'
 /**
  * 规范会话 ID ( 与网关 conversationId 一致 ):
  * 单聊 s:<minUid>:<maxUid>, 群聊 g:<groupId>
+ * ID 段为十进制字符串 ( int64, 见 entities/user/types )
  */
 export type ConversationKey = string
 
@@ -10,14 +11,14 @@ export type ConversationKey = string
 export interface SessionSummary {
   key: ConversationKey
   channelType: ChannelType
-  targetId: number | null
+  targetId: string | null
   name: string
   avatar: string | null
   isMuted: boolean
   isPinned: boolean
   lastMessage: {
     content: string
-    senderId: number | null
+    senderId: string | null
     contentType: string
     sentAtMs: number
   } | null
@@ -35,7 +36,7 @@ export interface ChatMessage {
   /** 发送前本地占位 ID ( 业务 body.id ), 用于和自身收件回执合并 */
   localId: string | null
   conversationKey: ConversationKey
-  senderId: number
+  senderId: string
   content: string
   contentType: MessageContentType
   sentAtMs: number
@@ -45,10 +46,9 @@ export interface ChatMessage {
 /** UPSTREAM 帧业务 body ( 网关不解释结构, backend 按此读取目的地与内容 ) */
 export interface UpstreamBizPayload {
   /** 前端本地消息 ID, 用于多端自同步时合并 */
-  id?: string
-  /** 仅展示用途, 服务端以盖章身份为准 */
-  sid?: number
-  destinationId: number
+  id: string
+  /** 单聊=对方 userId; 群聊=groupId ( 十进制字符串, 序列化时以数字字面量注入 ) */
+  destinationId: string
   destinationType: ChannelType
   content: string
   contentType: MessageContentType

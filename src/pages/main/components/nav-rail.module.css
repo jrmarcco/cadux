@@ -35,7 +35,7 @@
   height: 10px;
   border: 2px solid var(--nt-bg-rail);
   border-radius: 50%;
-  background: #34c759;
+  background: var(--nt-online-dot);
 }
 
 .nav-button {
@@ -60,7 +60,7 @@
 
 .nav-button-active,
 .nav-button-active:hover {
-  background: rgb(0 153 255 / 12%);
+  background: var(--nt-primary-soft);
   color: var(--nt-primary);
 }
 
@@ -89,11 +89,27 @@
   bottom: 0;
   left: 48px;
   z-index: 10;
-  min-width: 128px;
-  padding: 4px;
-  border-radius: 8px;
-  background: #fff;
-  box-shadow: 0 4px 16px rgb(31 35 41 / 14%);
+  width: 176px;
+  padding: 8px;
+  border-radius: 10px;
+  background: var(--nt-bg-popover);
+  box-shadow: var(--nt-shadow-popover);
+}
+
+.menu-section-label {
+  padding: 2px 6px 6px;
+  font-size: 11px;
+  color: var(--nt-text-tertiary);
+}
+
+.menu-theme {
+  padding: 0 0 2px;
+}
+
+.menu-divider {
+  height: 1px;
+  margin: 6px -8px 4px;
+  background: var(--nt-divider);
 }
 
 .menu-item {

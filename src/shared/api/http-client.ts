@@ -1,5 +1,6 @@
 import { API_BASE_URL } from '@shared/config/env'
 import { HTTP_TIMEOUT_MS } from '@shared/config/constants'
+import { parseJsonLossless } from '@shared/lib/lossless-json'
 import type { ApiEnvelope } from '@shared/types/api'
 import { getAuthBridge } from './auth-bridge'
 
@@ -35,7 +36,7 @@ function buildUrl(path: string, query?: HttpQuery): string {
 
 async function parseErrorBody(response: Response): Promise<string | null> {
   try {
-    const payload = (await response.json()) as { message?: string; msg?: string }
+    const payload = (await parseJsonLossless(await response.text())) as { message?: string; msg?: string }
     return payload.msg ?? payload.message ?? null
   } catch {
     return null
@@ -59,7 +60,10 @@ async function refreshTokensOnce(): Promise<void> {
     bridge?.onAuthLost()
     throw new ApiError('登录已过期', 401)
   }
-  const envelope = (await response.json()) as ApiEnvelope<{ accessToken: string; refreshToken: string }>
+  const envelope = (await parseJsonLossless(await response.text())) as ApiEnvelope<{
+    accessToken: string
+    refreshToken: string
+  }>
   if (!envelope.data?.accessToken) {
     bridge?.onAuthLost()
     throw new ApiError('登录已过期', 401)
@@ -127,7 +131,7 @@ export async function httpRequest<T>(path: string, options: RequestOptions = {})
     throw new ApiError(message, response.status)
   }
 
-  const envelope = (await response.json()) as ApiEnvelope<T>
+  const envelope = (await parseJsonLossless(await response.text())) as ApiEnvelope<T>
   if (envelope.code !== 200) {
     throw new ApiError(envelope.message || '请求失败', envelope.code)
   }

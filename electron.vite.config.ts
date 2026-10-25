@@ -23,6 +23,13 @@ export default defineConfig({
   },
   renderer: {
     root: 'src',
+    css: {
+      modules: {
+        // 项目内统一以 camelCase 访问 ( styles.settingsMenu ),
+        // 必须开启 camelCase 导出, 否则连字符类名静默失效
+        localsConvention: 'camelCaseOnly'
+      }
+    },
     resolve: {
       alias: {
         '@app': resolve(__dirname, 'src/app'),
@@ -34,6 +41,16 @@ export default defineConfig({
       }
     },
     plugins: [react()],
+    server: {
+      proxy: {
+        // dev 同源代理: 后端 CORS 预检在鉴权路由被 401 拦截 ( 待后端修复 ), 走代理规避
+        '/api': {
+          target: 'http://127.0.0.1:10081',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api/, '')
+        }
+      }
+    },
     build: {
       outDir: 'out/renderer',
       rollupOptions: {

@@ -103,6 +103,25 @@
   color: var(--nt-text-tertiary);
 }
 
+.send-button {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+  height: 34px;
+  padding: 0 22px;
+  border: none;
+  border-radius: 8px;
+  background: var(--nt-primary);
+  font-size: 13px;
+  color: #fff;
+  transition: background-color 0.12s ease;
+
+  &:hover {
+    background: var(--nt-primary-hover);
+  }
+}
+
 .detail-empty {
   display: flex;
   flex-direction: column;

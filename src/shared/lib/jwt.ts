@@ -25,14 +25,25 @@ export function isTokenExpired(token: string, skewMs = 5 * 60_000): boolean {
   return payload.exp * 1000 - skewMs <= Date.now()
 }
 
-/** 从 JWT 提取当前用户 ID ( 兼容 userId / uid / sub 等常见 claim ) */
-export function extractUserId(token: string): number | null {
-  const payload = decodeJwtPayload(token)
-  if (!payload) return null
-  for (const claim of ['userId', 'user_id', 'uid', 'id', 'sub']) {
-    const value = payload[claim]
-    if (typeof value === 'number' && Number.isFinite(value)) return value
-    if (typeof value === 'string' && /^\d+$/.test(value)) return Number(value)
+const USER_ID_CLAIMS = ['userId', 'user_id', 'uid', 'id', 'sub'] as const
+
+/**
+ * 从 JWT 提取当前用户 ID ( 十进制字符串 )。
+ * 不经 JSON.parse: user_id 为 int64 数字, 双精度往返会损坏
+ * ( 134605228232032256 → 134605228232032260 ), 因此用正则从 payload 原文提取。
+ */
+export function extractUserId(token: string): string | null {
+  const segments = token.split('.')
+  if (segments.length !== 3) return null
+  let payload: string
+  try {
+    payload = decodeBase64Url(segments[1])
+  } catch {
+    return null
+  }
+  for (const claim of USER_ID_CLAIMS) {
+    const match = payload.match(new RegExp(`"${claim}"\\s*:\\s*"?(-?\\d+)"?`))
+    if (match) return match[1]
   }
   return null
 }

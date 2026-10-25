@@ -1,12 +1,14 @@
 import type { ContactItem } from '@shared/types/api'
+import { Icon } from '@shared/ui/icon'
 import { Avatar } from '@shared/ui/avatar'
 import styles from './contacts.module.css'
 
 export interface ContactDetailProps {
   contact: ContactItem | null
+  onSendMessage?: (contact: ContactItem) => void
 }
 
-export function ContactDetail({ contact }: ContactDetailProps) {
+export function ContactDetail({ contact, onSendMessage }: ContactDetailProps) {
   if (!contact) {
     return (
       <div className={styles.detailEmpty}>
@@ -25,7 +27,7 @@ export function ContactDetail({ contact }: ContactDetailProps) {
       <div className={styles.detailRows}>
         <div className={styles.detailRow}>
           <span className={styles.detailLabel}>用户 ID</span>
-          <span className={styles.detailValue}>{contact.contactId}</span>
+          <span className={styles.detailValue}>{String(contact.contactId)}</span>
         </div>
         {contact.remarkName ? (
           <div className={styles.detailRow}>
@@ -46,6 +48,10 @@ export function ContactDetail({ contact }: ContactDetailProps) {
           </div>
         ) : null}
       </div>
+      <button type="button" className={styles.sendButton} onClick={() => onSendMessage?.(contact)}>
+        <Icon name="message" size={15} />
+        发消息
+      </button>
       <div className={styles.detailHint}>会话由服务端建立后，可在「消息」中开始聊天</div>
     </div>
   )

@@ -7,6 +7,7 @@ const desktop = {
   isMaximized: (): Promise<boolean> => ipcRenderer.invoke('window:get-maximized'),
   enterMain: (): Promise<void> => ipcRenderer.invoke('app:enter-main'),
   enterLogin: (): Promise<void> => ipcRenderer.invoke('app:enter-login'),
+  setBackground: (color: string): Promise<void> => ipcRenderer.invoke('window:set-background', color),
   onMaximizeChange: (callback: (maximized: boolean) => void): (() => void) => {
     const listener = (_event: Electron.IpcRendererEvent, maximized: boolean): void => callback(maximized)
     ipcRenderer.on('window:maximize-changed', listener)

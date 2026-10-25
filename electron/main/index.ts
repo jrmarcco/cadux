@@ -96,6 +96,10 @@ void app.whenReady().then(() => {
   ipcMain.handle('window:get-maximized', (event) => {
     return BrowserWindow.fromWebContents(event.sender)?.isMaximized() ?? false
   })
+  ipcMain.handle('window:set-background', (event, color: unknown) => {
+    if (typeof color !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(color)) return
+    BrowserWindow.fromWebContents(event.sender)?.setBackgroundColor(color)
+  })
   ipcMain.handle('app:enter-main', (event) => {
     const win = BrowserWindow.fromWebContents(event.sender)
     if (!win) return

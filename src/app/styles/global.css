@@ -10,6 +10,10 @@ body,
   height: 100%;
 }
 
+html {
+  overflow: hidden;
+}
+
 body {
   overflow: hidden;
   margin: 0;
@@ -20,6 +24,9 @@ body {
     sans-serif;
   font-size: 14px;
   -webkit-font-smoothing: antialiased;
+  transition:
+    background-color 0.16s ease,
+    color 0.16s ease;
 }
 
 button,
@@ -39,10 +46,10 @@ button {
 
 ::-webkit-scrollbar-thumb {
   border-radius: 4px;
-  background: rgb(0 0 0 / 18%);
+  background: var(--nt-scrollbar-thumb);
 
   &:hover {
-    background: rgb(0 0 0 / 28%);
+    background: var(--nt-scrollbar-thumb-hover);
   }
 }
 

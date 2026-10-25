@@ -4,6 +4,21 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>cadux</title>
+    <script>
+      // 主题预置: 在 CSS 生效前根据持久化偏好设置 data-theme, 避免暗色闪白 ( FOUC )
+      ;(function () {
+        var preference = 'auto'
+        try {
+          var raw = localStorage.getItem('cadux/theme')
+          if (raw) preference = (JSON.parse(raw).state || {}).preference || 'auto'
+        } catch (e) {
+          /* 忽略损坏的本地数据 */
+        }
+        var dark =
+          preference === 'dark' || (preference === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+        document.documentElement.dataset.theme = dark ? 'dark' : 'light'
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

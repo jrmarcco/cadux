@@ -1,8 +1,7 @@
 import type { ConversationKey } from '@entities/conversation'
 import { useConnectionState, useMessages, useSendMessage, useSession } from '@features/messaging'
-import { currentSelfId } from '@features/messaging'
+import { useAuthStore } from '@features/user-auth'
 import { Avatar } from '@shared/ui/avatar'
-import { useMemo } from 'react'
 import { MessageInput } from './message-input'
 import { MessageList } from './message-list'
 import styles from './chat.module.css'
@@ -16,7 +15,7 @@ export function ChatPanel({ activeKey }: ChatPanelProps) {
   const messages = useMessages(activeKey)
   const sendMessage = useSendMessage()
   const connection = useConnectionState()
-  const selfId = useMemo(() => currentSelfId(), [])
+  const selfId = useAuthStore((state) => state.userId)
 
   const handleResend = (content: string) => {
     if (activeKey) sendMessage(activeKey, content)

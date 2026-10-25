@@ -3,6 +3,30 @@
 > 版本: 2026-10 · 服务端: hermet ( backend ) + synp ( gateway )
 > 契约源: `api/README.md` 与 `api/proto` ( 唯一事实源 )
 
+## 0. 实测勘误 ( 2026-10-25, 以本地部署验证为准 )
+
+以下差异已由 cadux 客户端 E2E 与协议冒烟实测确认, **与本文其余章节冲突时以本节为准**;
+完整问题清单见 [backend-issues.md](./backend-issues.md)。
+
+1. **int64 一律以字符串承载**: WS 链路 protojson 将 `seq` / `latestSeq` / `senderId` /
+   `timestampMs` 序列化为**字符串** ( §4/§7 示例中的数字写法仅为示意 );
+   HTTP 链路虽以 JSON number 下发, 但超出 ±(2^53-1) 的 ID 会被 JS 精度损坏
+   ( `134605228232032256` ↔ `134605228232032260` ), **JS 客户端必须做无损解析**。
+2. **帧的 commandType 为枚举名字符串** ( 如 `"COMMAND_TYPE_UPSTREAM"` ), body 为
+   **base64(JSON)**——§4 表格中的数字为协议枚举值, 实际线上不出现; 详见网关文档
+   [frontend-websocket-guide.md](./frontend-websocket-guide.md)。
+3. **UPSTREAM body 的 `destinationId` 必须是精确的 JSON 数字字面量**: 传字符串会被服务端
+   静默丢弃 ( 无回执 ); 大 int64 也不能经 JS `Number` 序列化 ( 输出会变成损坏的最短表示 )。
+4. **落库 `message_id` = UPSTREAM 帧 messageId ( 非 body.id ); 落库 `body` = 纯文本 `content`
+   字段**, 不是 UPSTREAM body JSON 原文 ( 与 §7 描述不符 )——多端合并需按帧 ID 关联,
+   `contentType` 等字段在同步链路不可用。
+5. **protojson 省略 false 值字段**: `hasMore` / `cursorExpired` / 失败应答的 `isSuccess`
+   可能整个缺失, 按 false 处理; 失败应答仅 `errorMessage` ( 且为内部 gRPC 错误文本 )。
+6. **业务级失败静默丢弃**: 非好友 / 目标不存在 / body 反序列化失败均无系统消息,
+   `UPSTREAM_ACK{isSuccess:true}` 不代表业务成功 ( §11 现状确认, 含反序列化失败一类 )。
+7. **CORS**: 浏览器直连时 OPTIONS 预检在鉴权路由被 401 拦截且无 CORS 头,
+   Web 客户端须同源代理 ( Electron 主进程请求不受影响 )。
+
 ## 1. 架构总览
 
 ```

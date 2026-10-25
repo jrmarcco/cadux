@@ -1,3 +1,9 @@
+/**
+ * int64: hermet 以 JSON number 下发 ID, 超出 2^53 的值经无损解析后为字符串
+ * ( 见 shared/lib/lossless-json )。使用方须以 String(...) 归一后再比较/展示。
+ */
+export type Int64 = number | string
+
 /** 后端统一响应信封: {"code": <http status>, "message": "", "data": <any>} */
 export interface ApiEnvelope<T> {
   code: number
@@ -17,27 +23,27 @@ export interface TokenPair {
 }
 
 export interface ChannelItem {
-  id: number
+  id: Int64
   destination: string
   channelType: 'single' | 'group'
-  targetId: number
+  targetId: Int64
   channelName: string
   channelAvatar: string | null
   isMuted: boolean
   isPinned: boolean
-  lastMessageId: number | null
+  lastMessageId: Int64 | null
   lastMessageType: string | null
   lastMessageContent: string | null
-  lastMessageSenderId: number | null
+  lastMessageSenderId: Int64 | null
   lastMessageTime: number | null
   unreadCount: number
   mentionCount: number
 }
 
 export interface ContactItem {
-  id: number
-  userId: number
-  contactId: number
+  id: Int64
+  userId: Int64
+  contactId: Int64
   contactNickname: string
   contactAvatar: string | null
   contactGender: string | null
@@ -51,7 +57,7 @@ export interface ContactItem {
 export interface MessageSearchItem {
   messageId: string
   conversationId: string
-  senderId: number
+  senderId: Int64
   contentType: string
   sentAt: string
 }

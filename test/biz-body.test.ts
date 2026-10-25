@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { decodeBase64 } from '@shared/lib/base64'
-import { decodeBizBody, encodeBase64 } from '@features/messaging/lib/biz-body'
+import { decodeBizBody, encodeBase64, encodeUpstreamBody, toChatMessage } from '@features/messaging/lib/biz-body'
 
 function toBase64(text: string): string {
   const bytes = new TextEncoder().encode(text)
@@ -28,11 +28,88 @@ describe('decodeBizBody', () => {
     expect(decodeBizBody('')).toEqual({})
     expect(decodeBizBody('!!!not-json!!!')).toEqual({})
   })
+
+  it('兼容非 JSON 的透传 body: 解码后按纯文本 content 处理 ( 实测后端存在此情况 )', () => {
+    const biz = decodeBizBody(toBase64('hello B marco store fail'))
+    expect(biz.content).toBe('hello B marco store fail')
+  })
 })
 
 describe('encodeBase64', () => {
   it('UTF-8 安全: 中文与 emoji 可往返', () => {
     const text = '你好，cadux 🐍'
     expect(decodeBase64(encodeBase64(text))).toBe(text)
+  })
+})
+
+describe('encodeUpstreamBody ( destinationId 精确注入 )', () => {
+  it('destinationId 以裸数字字面量注入 ( int64 不经 Number )', () => {
+    const json = encodeUpstreamBody({
+      id: '01JD',
+      destinationId: '134605228232032256',
+      destinationType: 'single',
+      content: '你好',
+      contentType: 'text'
+    })
+    expect(json).toContain('"destinationId":134605228232032256')
+    const parsed = JSON.parse(json.replace('"destinationId":134605228232032256', '"destinationId":"OK"')) as {
+      destinationId: string
+      content: string
+      id: string
+    }
+    expect(parsed.destinationId).toBe('OK')
+    expect(parsed.content).toBe('你好')
+    expect(parsed.id).toBe('01JD')
+  })
+
+  it('小整数 destinationId 同样输出数字字面量', () => {
+    const json = encodeUpstreamBody({
+      id: 'x',
+      destinationId: '10002',
+      destinationType: 'single',
+      content: 'hi',
+      contentType: 'text'
+    })
+    expect(json).toContain('"destinationId":10002')
+  })
+
+  it('非法 destinationId 抛错', () => {
+    expect(() =>
+      encodeUpstreamBody({
+        id: 'x',
+        destinationId: '_not_digit',
+        destinationType: 'single',
+        content: 'hi',
+        contentType: 'text'
+      })
+    ).toThrow()
+  })
+
+  it('内容包含占位符字面量时不影响注入', () => {
+    const json = encodeUpstreamBody({
+      id: 'x',
+      destinationId: '10002',
+      destinationType: 'single',
+      content: '假装 "@@cadux-int64@@ 也不是占位符"',
+      contentType: 'text'
+    })
+    expect(JSON.parse(json)).toMatchObject({ destinationId: 10002 })
+  })
+})
+
+describe('toChatMessage ( int64 senderId )', () => {
+  it('protojson 字符串 senderId 原样保留, 不做 Number 损坏', () => {
+    const message = toChatMessage(
+      {
+        messageId: 'm1',
+        senderId: '134605228232032256',
+        body: toBase64(JSON.stringify({ id: 'local-1', content: 'hi' })),
+        sentAt: '2026-10-25T10:00:00Z'
+      },
+      's:1:2'
+    )
+    expect(message.senderId).toBe('134605228232032256')
+    expect(message.localId).toBe('local-1')
+    expect(message.status).toBe('sent')
   })
 })

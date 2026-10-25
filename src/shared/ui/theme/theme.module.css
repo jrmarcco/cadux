@@ -1,0 +1,36 @@
+.switcher {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 8px;
+  background: var(--nt-search-bg);
+}
+
+.option {
+  display: inline-flex;
+  flex: 1;
+  gap: 4px;
+  align-items: center;
+  justify-content: center;
+  height: 26px;
+  padding: 0 6px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 12px;
+  color: var(--nt-text-secondary);
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease;
+
+  &:hover {
+    color: var(--nt-text-primary);
+  }
+}
+
+.option-active,
+.option-active:hover {
+  background: var(--nt-bg-popover);
+  color: var(--nt-primary);
+  box-shadow: var(--nt-shadow-card);
+}

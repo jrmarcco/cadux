@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { IconName } from '@shared/ui/icon'
 import { Icon } from '@shared/ui/icon'
 import { Avatar } from '@shared/ui/avatar'
+import { ThemeSwitcher } from '@shared/ui/theme/theme-switcher'
 import { signOutApi, useAuthStore } from '@features/user-auth'
 import { useUnreadTotal } from '@features/messaging'
 import styles from './nav-rail.module.css'
@@ -63,6 +64,11 @@ export function NavRail({ tab, onChange }: NavRailProps) {
           </button>
           {settingsOpen ? (
             <div className={styles.settingsMenu}>
+              <div className={styles.menuSectionLabel}>主题</div>
+              <div className={styles.menuTheme}>
+                <ThemeSwitcher />
+              </div>
+              <div className={styles.menuDivider} />
               <button type="button" className={styles.menuItem} onClick={handleSignOut}>
                 <Icon name="logout" size={14} />
                 退出登录

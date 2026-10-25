@@ -7,7 +7,8 @@ export function mapChannels(items: ChannelItem[]): SessionSummary[] {
   return items.map((item) => ({
     key: normalizeConversationKey(item.destination),
     channelType: item.channelType === 'group' ? 'group' : 'single',
-    targetId: item.targetId ?? null,
+    // int64: 统一归一为十进制字符串 ( 大 ID 经无损解析后本来就是字符串 )
+    targetId: item.targetId != null ? String(item.targetId) : null,
     name: item.channelName && item.channelName.length > 0 ? item.channelName : item.destination,
     avatar: item.channelAvatar ?? null,
     isMuted: Boolean(item.isMuted),
@@ -16,7 +17,7 @@ export function mapChannels(items: ChannelItem[]): SessionSummary[] {
       typeof item.lastMessageTime === 'number' && item.lastMessageTime > 0
         ? {
             content: item.lastMessageContent ?? '',
-            senderId: item.lastMessageSenderId ?? null,
+            senderId: item.lastMessageSenderId != null ? String(item.lastMessageSenderId) : null,
             contentType: item.lastMessageType ?? 'text',
             sentAtMs: item.lastMessageTime
           }

@@ -6,7 +6,7 @@ import { useContacts } from '../hooks/use-contacts'
 import styles from './contacts.module.css'
 
 export interface ContactsPanelProps {
-  selectedId: number | null
+  selectedId: string | number | null
   onSelect: (contact: ContactItem) => void
 }
 

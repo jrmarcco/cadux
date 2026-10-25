@@ -1,5 +1,4 @@
 import { GATEWAY_PROTOCOL } from '@shared/config/constants'
-import { encodeBase64 } from '@shared/lib/base64'
 import { ulid } from 'ulid'
 import {
   CommandType,
@@ -63,7 +62,14 @@ export function decodePayload<T>(body: string): T {
 }
 
 function encodePayload(payload: unknown): string {
-  return encodeBase64(JSON.stringify(payload ?? null))
+  return encodeBase64Text(JSON.stringify(payload ?? null))
+}
+
+function encodeBase64Text(text: string): string {
+  const bytes = new TextEncoder().encode(text)
+  let binary = ''
+  for (const byte of bytes) binary += String.fromCharCode(byte)
+  return btoa(binary)
 }
 
 /**
@@ -84,21 +90,30 @@ export class GatewayClient {
   private upstreamAttempts = new Map<string, number>()
   private state: ClientConnectionState = 'idle'
   private stopped = true
+  /** 事件环形日志 ( dev 调试观测用, 最近 60 条 ) */
+  private trace: string[] = []
+
+  private log(event: string): void {
+    this.trace.push(`${Date.now() % 100000} ${event}`)
+    if (this.trace.length > 60) this.trace.shift()
+  }
 
   constructor(private readonly options: GatewayClientOptions) {}
 
   start(): void {
     this.stopped = false
+    this.log('start')
     this.setState('connecting')
     this.open()
   }
 
   stop(): void {
+    this.log('stop')
     this.stopped = true
     this.clearTimers()
     this.failAllPending()
     this.upstreamAttempts.clear()
-    this.closeSocket()
+    this.closeSocket('stop')
     this.setState('disconnected')
   }
 
@@ -111,13 +126,21 @@ export class GatewayClient {
     void this.runConversationSync(conversationId)
   }
 
-  sendUpstream(biz: Record<string, unknown>, bizId: string): void {
+  /**
+   * 发送业务消息。bodyJson 须由 encodeUpstreamBody 生成
+   * ( destinationId 为 int64, 需要精确数字字面量注入, 不能经 Number 序列化 )。
+   * 返回帧 ID: 实测 hermet 落库的 message_id 即该帧 ID ( 非 body.id ),
+   * 自身收件回显据此与 pending 消息合并; 连接不可用返回 null。
+   */
+  sendUpstream(bodyJson: string, bizId: string): string | null {
     if (!this.isOpen()) {
       this.options.handlers.onUpstreamFailed(bizId)
-      return
+      return null
     }
+    const frameId = ulid()
     this.upstreamAttempts.set(bizId, 1)
-    void this.dispatchUpstream(ulid(), biz, bizId)
+    void this.dispatchUpstream(frameId, bodyJson, bizId)
+    return frameId
   }
 
   // —— 连接 ——
@@ -130,14 +153,30 @@ export class GatewayClient {
       this.scheduleReconnect()
       return
     }
+    this.log(`open wsState=${ws.readyState}`)
     this.ws = ws
     ws.onopen = () => {
+      this.log('onopen → auth')
       void this.authenticate()
     }
-    ws.onmessage = (event) => {
-      this.handleRawFrame(event.data)
+    ws.onmessage = (event: MessageEvent<unknown>) => {
+      // 实测 ( 2026-10-25 ): synp 下行帧为二进制帧 ( payload 是 JSON 文本 ),
+      // 浏览器 WebSocket 以 Blob 投递 ( Node 为 Blob、字符串混投 ), 统一收敛为文本
+      const data = event.data
+      if (typeof data === 'string') {
+        this.handleRawFrame(data)
+        return
+      }
+      if (data instanceof Blob) {
+        void data.text().then((text) => this.handleRawFrame(text))
+        return
+      }
+      if (data instanceof ArrayBuffer) {
+        this.handleRawFrame(new TextDecoder().decode(data))
+      }
     }
-    ws.onclose = () => {
+    ws.onclose = (ev) => {
+      this.log(`onclose code=${ev.code} wasClean=${ev.wasClean}`)
       this.failAllPending()
       if (!this.stopped) this.scheduleReconnect()
     }
@@ -146,7 +185,8 @@ export class GatewayClient {
     }
   }
 
-  private closeSocket(): void {
+  private closeSocket(reason: string): void {
+    this.log(`closeSocket ${reason}`)
     const ws = this.ws
     this.ws = null
     if (ws && ws.readyState !== WebSocket.CLOSED) {
@@ -170,13 +210,33 @@ export class GatewayClient {
       this.handleAuthFailure()
       return
     }
-    const ack = await this.request(CommandType.AUTH, { token }, GATEWAY_PROTOCOL.AUTH_TIMEOUT_MS)
-    const payload = ack ? decodePayload<{ success?: boolean }>(ack.body) : null
+    // 实测 ( 2026-10-25 ): 存在同设备旧连接时, 网关踢旧的瞬间新连接的 AUTH_ACK
+    // 可能丢失 ( 网关日志 "failed to send message: connection closed" )。
+    // 协议规定重复 AUTH 幂等 → 在同一连接上重发 AUTH 收敛, 而不是断线重连。
+    let ack: Frame | null = null
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (this.stopped || !this.isOpen()) break
+      ack = await this.request(CommandType.AUTH, { token }, GATEWAY_PROTOCOL.ACK_TIMEOUT_MS)
+      if (ack || this.stopped) break
+      this.log(`auth-retry attempt=${attempt + 1}`)
+    }
     if (this.stopped) return
+    if (!ack) {
+      // 重试耗尽: 连接在鉴权期间断开 ( 顶号 / 网络抖动 / 宿主挂起 ) 时
+      // 不能据此判定凭证失效, 交由重连流程重新 AUTH; 连接仍在则主动触发重连
+      if (this.isOpen()) {
+        this.closeSocket('ack-timeout')
+        this.scheduleReconnect()
+      }
+      return
+    }
+    const payload = decodePayload<{ success?: boolean }>(ack.body)
     if (!payload?.success) {
+      this.log(`auth-ack success=${String(payload?.success)}`)
       this.handleAuthFailure()
       return
     }
+    this.log('auth-ok')
     this.reconnectAttempts = 0
     this.missedHeartbeats = 0
     this.setState('connected')
@@ -185,16 +245,18 @@ export class GatewayClient {
   }
 
   private handleAuthFailure(): void {
+    this.log('auth-failure')
     this.stopped = true
     this.clearTimers()
     this.failAllPending()
     this.upstreamAttempts.clear()
-    this.closeSocket()
+    this.closeSocket('auth-failure')
     this.setState('disconnected')
     this.options.handlers.onAuthFailed()
   }
 
   private scheduleReconnect(): void {
+    if (this.reconnectTimer !== null) return
     if (this.stopped) {
       this.setState('disconnected')
       return
@@ -207,6 +269,7 @@ export class GatewayClient {
     )
     const delay = base + Math.random() * 500
     this.reconnectAttempts += 1
+    this.log(`schedule-reconnect delay=${Math.round(delay)}`)
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null
       if (!this.stopped) this.open()
@@ -221,8 +284,9 @@ export class GatewayClient {
       this.missedHeartbeats += 1
       if (this.missedHeartbeats > GATEWAY_PROTOCOL.HEARTBEAT_MISS_LIMIT) {
         // 看门狗: 连续无回显, 主动断开走重连
+        this.log('watchdog-reconnect')
         this.clearTimers()
-        this.closeSocket()
+        this.closeSocket('watchdog')
         this.scheduleReconnect()
         return
       }
@@ -300,6 +364,7 @@ export class GatewayClient {
     }
     if (frame.commandType.endsWith('_ACK')) {
       const pending = this.pending.get(frame.messageId)
+      this.log(`recv ${frame.commandType} matched=${Boolean(pending)}`)
       if (pending) {
         this.pending.delete(frame.messageId)
         clearTimeout(pending.timer)
@@ -310,8 +375,10 @@ export class GatewayClient {
 
     switch (frame.commandType) {
       case CommandType.NOTIFY: {
-        const { latestSeq } = decodePayload<{ latestSeq?: number }>(frame.body)
-        if (typeof latestSeq === 'number' && latestSeq > this.options.getInboxCursor()) {
+        // 实测: protojson 将 int64 latestSeq 序列化为字符串, 统一收敛为 number
+        const { latestSeq } = decodePayload<{ latestSeq?: number | string }>(frame.body)
+        const seq = Number(latestSeq)
+        if (Number.isFinite(seq) && seq > this.options.getInboxCursor()) {
           void this.runSyncLoop()
         }
         break
@@ -324,13 +391,13 @@ export class GatewayClient {
 
   // —— 上行消息 ——
 
-  private async dispatchUpstream(messageId: string, biz: Record<string, unknown>, bizId: string): Promise<void> {
+  private async dispatchUpstream(messageId: string, bodyJson: string, bizId: string): Promise<void> {
     if (!this.isOpen()) {
       this.upstreamAttempts.delete(bizId)
       this.options.handlers.onUpstreamFailed(bizId)
       return
     }
-    this.writeFrame({ commandType: CommandType.UPSTREAM, messageId, body: encodePayload(biz) })
+    this.writeFrame({ commandType: CommandType.UPSTREAM, messageId, body: encodeBase64Text(bodyJson) })
     const ack = await this.awaitAck(messageId, GATEWAY_PROTOCOL.ACK_TIMEOUT_MS)
     const payload = ack ? decodePayload<{ isSuccess?: boolean }>(ack.body) : null
     if (payload?.isSuccess) {
@@ -342,7 +409,7 @@ export class GatewayClient {
     const attempts = this.upstreamAttempts.get(bizId) ?? 0
     if (attempts < GATEWAY_PROTOCOL.UPSTREAM_MAX_RETRIES && !this.stopped) {
       this.upstreamAttempts.set(bizId, attempts + 1)
-      void this.dispatchUpstream(messageId, biz, bizId)
+      void this.dispatchUpstream(messageId, bodyJson, bizId)
       return
     }
     this.upstreamAttempts.delete(bizId)
@@ -378,16 +445,18 @@ export class GatewayClient {
         }
 
         for (const entry of payload.response.entries ?? []) {
-          if (entry.seq <= this.options.getInboxCursor()) continue
+          // 实测: seq 为 protojson int64 → 字符串, 收敛为 number 再比较与推进游标
+          const seq = Number(entry.seq)
+          if (!Number.isFinite(seq) || seq <= this.options.getInboxCursor()) continue
           if (entry.message) {
             this.options.handlers.onInboxMessage(entry.message)
           } else if (entry.conversationUpdate) {
             this.options.handlers.onConversationUpdate(
               entry.conversationUpdate.conversationId,
-              entry.conversationUpdate.conversationLatestSeq
+              Number(entry.conversationUpdate.conversationLatestSeq)
             )
           }
-          this.options.handlers.onInboxEntryApplied(entry.seq)
+          this.options.handlers.onInboxEntryApplied(seq)
         }
         hasMore = Boolean(payload.response.hasMore)
       }
@@ -415,11 +484,28 @@ export class GatewayClient {
       if (!payload.isSuccess || !payload.response?.messages) return
 
       for (const item of payload.response.messages) {
-        if (item.conversationSeq <= cursor) continue
-        this.options.handlers.onConversationMessage(conversationId, item.conversationSeq, item.message)
-        this.options.handlers.onConversationEntryApplied(conversationId, item.conversationSeq)
+        // 实测: conversationSeq 为 protojson int64 → 字符串, 收敛为 number
+        const conversationSeq = Number(item.conversationSeq)
+        if (!Number.isFinite(conversationSeq) || conversationSeq <= cursor) continue
+        this.options.handlers.onConversationMessage(conversationId, conversationSeq, item.message)
+        this.options.handlers.onConversationEntryApplied(conversationId, conversationSeq)
       }
       if (!payload.response.hasMore) return
+    }
+  }
+
+  /** 调试观测: 当前连接状态快照 ( window.__caduxDebug 使用 ) */
+  debugSnapshot(): {
+    state: ClientConnectionState
+    wsState: number
+    reconnectAttempts: number
+    trace: string[]
+  } {
+    return {
+      state: this.state,
+      wsState: this.ws?.readyState ?? -1,
+      reconnectAttempts: this.reconnectAttempts,
+      trace: [...this.trace]
     }
   }
 

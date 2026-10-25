@@ -8,14 +8,13 @@ import styles from './chat.module.css'
 export interface MessageListProps {
   messages: ChatMessage[]
   session: SessionSummary
-  selfId: number | null
+  selfId: string | null
   onResend: (content: string) => void
 }
 
 export function MessageList({ messages, session, selfId, onResend }: MessageListProps) {
   const account = useAuthStore((state) => state.account)
   const scrollRef = useRef<HTMLDivElement>(null)
-  const bottomRef = useRef<HTMLDivElement>(null)
   const prevCountRef = useRef(0)
 
   useEffect(() => {
@@ -23,7 +22,8 @@ export function MessageList({ messages, session, selfId, onResend }: MessageList
     if (!el) return
     const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 140
     if (nearBottom || prevCountRef.current === 0) {
-      bottomRef.current?.scrollIntoView()
+      // 只滚消息容器自身: scrollIntoView 会连带滚动文档根节点, 导致整个界面上移
+      el.scrollTop = el.scrollHeight
     }
     prevCountRef.current = messages.length
   }, [messages])
@@ -39,7 +39,8 @@ export function MessageList({ messages, session, selfId, onResend }: MessageList
           ? (account ?? '我')
           : session.channelType === 'single'
             ? session.name
-            : `用户${message.senderId}`
+            : // 群聊无成员资料接口, 以 ID 末 4 位占位
+              `用户 ${message.senderId.slice(-4)}`
 
         return (
           <div key={message.id}>
@@ -59,7 +60,6 @@ export function MessageList({ messages, session, selfId, onResend }: MessageList
           </div>
         )
       })}
-      <div ref={bottomRef} />
     </div>
   )
 }
