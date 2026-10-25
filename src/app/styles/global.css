@@ -1,0 +1,51 @@
+@import './tokens.css';
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  overflow: hidden;
+  margin: 0;
+  background: var(--nt-bg-window);
+  color: var(--nt-text-primary);
+  font-family:
+    -apple-system, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial,
+    sans-serif;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+textarea {
+  font-family: inherit;
+}
+
+button {
+  cursor: default;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  border-radius: 4px;
+  background: rgb(0 0 0 / 18%);
+
+  &:hover {
+    background: rgb(0 0 0 / 28%);
+  }
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}

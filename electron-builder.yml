@@ -1,0 +1,33 @@
+appId: com.cadux.app
+productName: cadux
+copyright: Copyright © 2026 cadux
+directories:
+  output: release
+  buildResources: build
+files:
+  - out/**
+  - package.json
+asar: true
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  artifactName: cadux-Setup-${version}.${ext}
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  shortcutName: cadux
+mac:
+  target:
+    - target: dmg
+      arch:
+        - x64
+        - arm64
+  category: public.app-category.social-networking
+  artifactName: cadux-${version}-${arch}.${ext}
+  identity: null
+dmg:
+  title: cadux ${version}

@@ -50,11 +50,11 @@
 
 ### 3.1 认证
 
-| 方法 | 路径 | 鉴权 | 说明 |
-|---|---|---|---|
-| POST | `/api/v1/auth/sign-in` | 无 | 登录 |
-| POST | `/api/v1/auth/refresh-token` | 无 | 刷新 token |
-| POST | `/api/v1/auth/sign-out` | 是 | 登出 ( 使 session 失效 ) |
+| 方法 | 路径                         | 鉴权 | 说明                     |
+| ---- | ---------------------------- | ---- | ------------------------ |
+| POST | `/api/v1/auth/sign-in`       | 无   | 登录                     |
+| POST | `/api/v1/auth/refresh-token` | 无   | 刷新 token               |
+| POST | `/api/v1/auth/sign-out`      | 是   | 登出 ( 使 session 失效 ) |
 
 **sign-in**
 
@@ -80,12 +80,12 @@
 
 ### 3.2 联系人
 
-| 方法 | 路径 | 说明 |
-|---|---|---|
-| POST | `/api/v1/contact/apply` | 发起好友申请 |
-| POST | `/api/v1/contact/review` | 审批好友申请 ( 通过后双向建立联系人 ) |
-| GET  | `/api/v1/contact/applications` | 收到的好友申请列表 |
-| GET  | `/api/v1/contact/contacts` | 联系人列表 |
+| 方法 | 路径                           | 说明                                  |
+| ---- | ------------------------------ | ------------------------------------- |
+| POST | `/api/v1/contact/apply`        | 发起好友申请                          |
+| POST | `/api/v1/contact/review`       | 审批好友申请 ( 通过后双向建立联系人 ) |
+| GET  | `/api/v1/contact/applications` | 收到的好友申请列表                    |
+| GET  | `/api/v1/contact/contacts`     | 联系人列表                            |
 
 ```json
 // apply
@@ -110,8 +110,8 @@
 
 ### 3.3 群聊
 
-| 方法 | 路径 | 说明 |
-|---|---|---|
+| 方法 | 路径                   | 说明                  |
+| ---- | ---------------------- | --------------------- |
 | POST | `/api/v1/group/create` | 建群 ( 创建者为群主 ) |
 
 ```json
@@ -125,34 +125,36 @@
 
 ### 3.4 会话列表
 
-| 方法 | 路径 | 说明 |
-|---|---|---|
-| GET | `/api/v1/channel/channels` | 当前用户的会话列表 ( 按最后消息时间倒序 ) |
+| 方法 | 路径                       | 说明                                      |
+| ---- | -------------------------- | ----------------------------------------- |
+| GET  | `/api/v1/channel/channels` | 当前用户的会话列表 ( 按最后消息时间倒序 ) |
 
 ```json
 // data[] 关键字段
 {
   "id": 123,
-  "destination": "10001:10002",     // 会话目的地 ( 见 §5 会话 ID 规则 )
-  "channelType": "single",          // single=单聊 / group=群聊
+  "destination": "10001:10002", // 会话目的地 ( 见 §5 会话 ID 规则 )
+  "channelType": "single", // single=单聊 / group=群聊
   "targetId": 10002,
   "channelName": "对方昵称或群名",
   "channelAvatar": "...",
-  "isMuted": false, "isPinned": false,
+  "isMuted": false,
+  "isPinned": false,
   "lastMessageId": 456,
   "lastMessageType": "text",
   "lastMessageContent": "最后一条消息摘要",
   "lastMessageSenderId": 10001,
   "lastMessageTime": 1761400000000,
-  "unreadCount": 3, "mentionCount": 0
+  "unreadCount": 3,
+  "mentionCount": 0
 }
 ```
 
 ### 3.5 消息搜索 ( ES )
 
-| 方法 | 路径 | 说明 |
-|---|---|---|
-| GET | `/api/v1/message/search` | 会话内关键词搜索 ( 需为会话参与者 ) |
+| 方法 | 路径                     | 说明                                |
+| ---- | ------------------------ | ----------------------------------- |
+| GET  | `/api/v1/message/search` | 会话内关键词搜索 ( 需为会话参与者 ) |
 
 Query 参数: `conversationId` ( 会话 ID，见 §5 )、`keyword`、`from` ( 默认 0 )、`size` ( 默认 20，上限 100 )
 
@@ -173,25 +175,25 @@ Query 参数: `conversationId` ( 会话 ID，见 §5 )、`keyword`、`from` ( �
 
 ```json
 {
-  "commandType": 4,          // CommandType 数字，见下表
-  "messageId": "01JD...",    // 帧唯一 ID ( 前端建议 ULID )，*_ACK 原样回填
-  "body": "..."              // 按 commandType 解释，JSON 序列化后的字符串/对象
+  "commandType": 4, // CommandType 数字，见下表
+  "messageId": "01JD...", // 帧唯一 ID ( 前端建议 ULID )，*_ACK 原样回填
+  "body": "..." // 按 commandType 解释，JSON 序列化后的字符串/对象
 }
 ```
 
-| 指令 | 值 | 方向 | body |
-|---|---|---|---|
-| HEARTBEAT | 1 | C→G | 空 |
-| AUTH | 2 | C→G | `{"token": "<accessToken>"}` |
-| AUTH_ACK | 3 | G→C | `{"success": true}` 或 `{"success": false, "errorMessage": "..."}` |
-| UPSTREAM | 4 | C→G | 业务消息 ( §5 ) |
-| UPSTREAM_ACK | 5 | G→C | `{"isSuccess": true, "timestampMs": 1761400000000}` |
-| SYNC | 6 | C→G | `{"cursor": 42, "limit": 0}` |
-| SYNC_ACK | 7 | G→C | `{"isSuccess": true, "response": {...}}` |
-| CONVERSATION_SYNC | 8 | C→G | `{"conversationId": "g:100", "cursor": 0, "limit": 0}` |
-| CONVERSATION_SYNC_ACK | 9 | G→C | `{"isSuccess": true, "response": {...}}` |
-| NOTIFY | 10 | G→C | `{"latestSeq": 43}` |
-| REDIRECT / RATE_LIMIT_EXCEEDED | 11 / 12 | G→C | 预留 |
+| 指令                           | 值      | 方向 | body                                                               |
+| ------------------------------ | ------- | ---- | ------------------------------------------------------------------ |
+| HEARTBEAT                      | 1       | C→G  | 空                                                                 |
+| AUTH                           | 2       | C→G  | `{"token": "<accessToken>"}`                                       |
+| AUTH_ACK                       | 3       | G→C  | `{"success": true}` 或 `{"success": false, "errorMessage": "..."}` |
+| UPSTREAM                       | 4       | C→G  | 业务消息 ( §5 )                                                    |
+| UPSTREAM_ACK                   | 5       | G→C  | `{"isSuccess": true, "timestampMs": 1761400000000}`                |
+| SYNC                           | 6       | C→G  | `{"cursor": 42, "limit": 0}`                                       |
+| SYNC_ACK                       | 7       | G→C  | `{"isSuccess": true, "response": {...}}`                           |
+| CONVERSATION_SYNC              | 8       | C→G  | `{"conversationId": "g:100", "cursor": 0, "limit": 0}`             |
+| CONVERSATION_SYNC_ACK          | 9       | G→C  | `{"isSuccess": true, "response": {...}}`                           |
+| NOTIFY                         | 10      | G→C  | `{"latestSeq": 43}`                                                |
+| REDIRECT / RATE_LIMIT_EXCEEDED | 11 / 12 | G→C  | 预留                                                               |
 
 **规则**
 
@@ -205,12 +207,12 @@ body 是前端自定义 JSON，网关与后端不解释结构，但 backend 按�
 
 ```json
 {
-  "id": "01JD...",              // 可选，前端本地消息 ID
-  "sid": 10001,                 // 可选，仅展示用途 ( 服务端以盖章身份为准 )
-  "destinationId": 10002,       // 必填: 单聊=对方 userId；群聊=groupId
-  "destinationType": "single",  // 必填: single=单聊 / group=群聊
-  "content": "你好",             // 必填: 消息内容 ( 文本，UTF-8；搜索按全文索引 )
-  "contentType": "text"         // 必填: text / image
+  "id": "01JD...", // 可选，前端本地消息 ID
+  "sid": 10001, // 可选，仅展示用途 ( 服务端以盖章身份为准 )
+  "destinationId": 10002, // 必填: 单聊=对方 userId；群聊=groupId
+  "destinationType": "single", // 必填: single=单聊 / group=群聊
+  "content": "你好", // 必填: 消息内容 ( 文本，UTF-8；搜索按全文索引 )
+  "contentType": "text" // 必填: text / image
 }
 ```
 
@@ -230,10 +232,10 @@ UPSTREAM ( messageId=帧ID, body=上述 JSON )
 
 ## 6. 会话 ID 规则 ( conversationId )
 
-| 类型 | 格式 | 示例 | 用途 |
-|---|---|---|---|
-| 单聊 | `s:<minUid>:<maxUid>` | `s:10001:10002` | 搜索接口 |
-| 群聊 | `g:<groupId>` | `g:500` | 搜索接口 / CONVERSATION_SYNC |
+| 类型 | 格式                  | 示例            | 用途                         |
+| ---- | --------------------- | --------------- | ---------------------------- |
+| 单聊 | `s:<minUid>:<maxUid>` | `s:10001:10002` | 搜索接口                     |
+| 群聊 | `g:<groupId>`         | `g:500`         | 搜索接口 / CONVERSATION_SYNC |
 
 > 注意: `/api/v1/channel/channels` 返回的 `destination` 字段是**不带前缀**的历史格式
 > ( 单聊 `minUid:maxUid`、群聊 `groupId` 裸数字 )，仅用于会话列表展示与本地组织；
@@ -306,15 +308,15 @@ UPSTREAM ( messageId=帧ID, body=上述 JSON )
 
 ## 10. 常量与默认值
 
-| 项 | 值 |
-|---|---|
-| accessToken 有效期 | 2h |
-| refreshToken 有效期 | 7 天 |
-| WS AUTH 超时 | 15s |
-| WS 空闲断开 | ~90s ( 建议 30s 心跳 ) |
-| SYNC 默认页大小 | 100 ( 上限 500 ) |
-| 搜索页大小 | 默认 20 ( 上限 100 ) |
-| 写扩散/读扩散阈值 | 群成员 ≤ 500 内联正本，> 500 走 timeline |
+| 项                  | 值                                       |
+| ------------------- | ---------------------------------------- |
+| accessToken 有效期  | 2h                                       |
+| refreshToken 有效期 | 7 天                                     |
+| WS AUTH 超时        | 15s                                      |
+| WS 空闲断开         | ~90s ( 建议 30s 心跳 )                   |
+| SYNC 默认页大小     | 100 ( 上限 500 )                         |
+| 搜索页大小          | 默认 20 ( 上限 100 )                     |
+| 写扩散/读扩散阈值   | 群成员 ≤ 500 内联正本，> 500 走 timeline |
 
 ## 11. 尚未支持 ( 前端请勿依赖 )
 

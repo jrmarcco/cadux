@@ -33,16 +33,16 @@ backend ( 业务后端: 落库、seq 分配、发通知 )
 ws(s)://<gateway-host>:10071?device=<mobile|tablet|pc>
 ```
 
-| 参数 | 说明 |
-|---|---|
+| 参数     | 说明                                                                                                                          |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | `device` | 设备类型 `mobile` / `tablet` / `pc`; 缺省或非法值按 `unknown` 处理。**同一账号同一 `device` 的新连接会顶掉旧连接** ( 顶号 )。 |
 
 请求头 ( 可选 ):
 
-| Header | 说明 |
-|---|---|
+| Header                                                                    | 说明                                                      |
+| ------------------------------------------------------------------------- | --------------------------------------------------------- |
 | `Sec-WebSocket-Extensions: permessage-deflate; client_max_window_bits=15` | 启用压缩。浏览器 `WebSocket` API 自动协商, 无需手动处理。 |
-| `X-Auto-Close: true` | 允许网关在连接空闲约 2 分钟后主动关闭 ( 一般不传 )。 |
+| `X-Auto-Close: true`                                                      | 允许网关在连接空闲约 2 分钟后主动关闭 ( 一般不传 )。      |
 
 **注意: token 不要放在 URL 或请求头里。** 鉴权在连接建立后的第一帧完成
 ( 见下一节 ), token 因此不落入访问日志与代理日志。
@@ -59,11 +59,11 @@ ws(s)://<gateway-host>:10071?device=<mobile|tablet|pc>
 }
 ```
 
-| 字段 | 类型 | 说明 |
-|---|---|---|
-| `commandType` | string | 指令, 枚举名 ( 见 [指令一览](#5-指令一览) )。 |
-| `messageId` | string | **由前端生成**的帧唯一标识, 建议 ULID。作用: ① 请求/应答关联 ( ACK 帧原样回填 ); ② 帧去重 ( 见 [message_id 约定](#message-id-约定) )。 |
-| `body` | string | 帧体, **base64 编码**的 JSON。先构造业务 payload 的 JSON, 再整体 base64。 |
+| 字段          | 类型   | 说明                                                                                                                                   |
+| ------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `commandType` | string | 指令, 枚举名 ( 见 [指令一览](#5-指令一览) )。                                                                                          |
+| `messageId`   | string | **由前端生成**的帧唯一标识, 建议 ULID。作用: ① 请求/应答关联 ( ACK 帧原样回填 ); ② 帧去重 ( 见 [message_id 约定](#message-id-约定) )。 |
+| `body`        | string | 帧体, **base64 编码**的 JSON。先构造业务 payload 的 JSON, 再整体 base64。                                                              |
 
 > 字段名说明: 网关按 protojson 编解码, 序列化输出 lowerCamelCase
 > ( `commandType` / `messageId` / `latestSeq` ... ); 解析时同时兼容
@@ -74,10 +74,10 @@ ws(s)://<gateway-host>:10071?device=<mobile|tablet|pc>
 
 ```typescript
 // 编码: payload JSON → base64
-const body = btoa(JSON.stringify({ token: jwt }));
+const body = btoa(JSON.stringify({ token: jwt }))
 
 // 解码: base64 → payload JSON
-const payload = JSON.parse(atob(frame.body));
+const payload = JSON.parse(atob(frame.body))
 ```
 
 > Node.js 环境用 `Buffer.from(obj, 'utf8').toString('base64')` /
@@ -85,12 +85,12 @@ const payload = JSON.parse(atob(frame.body));
 
 ### 连接参数与限制 ( 网关默认值 )
 
-| 项 | 值 | 说明 |
-|---|---|---|
-| 鉴权超时 | **15s** | 连接建立后 15s 内未完成 AUTH, 网关关闭连接。 |
-| 单帧大小上限 | **64KiB** | 超限连接被关闭。拆分业务大消息, 或走业务侧对象存储。 |
-| 每连接读限流 | **10 帧/s** ( 平滑 ) | 超速帧会被延迟处理, 持续超速建议自查。 |
-| 鉴权后读超时 | 90s | 连续 90s 无任何上行帧 ( 含心跳 ) 连接可能被断开。**心跳必发**。 |
+| 项           | 值                   | 说明                                                            |
+| ------------ | -------------------- | --------------------------------------------------------------- |
+| 鉴权超时     | **15s**              | 连接建立后 15s 内未完成 AUTH, 网关关闭连接。                    |
+| 单帧大小上限 | **64KiB**            | 超限连接被关闭。拆分业务大消息, 或走业务侧对象存储。            |
+| 每连接读限流 | **10 帧/s** ( 平滑 ) | 超速帧会被延迟处理, 持续超速建议自查。                          |
+| 鉴权后读超时 | 90s                  | 连续 90s 无任何上行帧 ( 含心跳 ) 连接可能被断开。**心跳必发**。 |
 
 ## 3. 鉴权 ( 第一帧必须是 AUTH )
 
@@ -110,11 +110,11 @@ token 为短周期凭证 ( 建议 ≤ 2h ), 过期后需要重新登录获取并
 
 ```typescript
 const authFrame = {
-  commandType: "COMMAND_TYPE_AUTH",
+  commandType: 'COMMAND_TYPE_AUTH',
   messageId: ulid(),
-  body: btoa(JSON.stringify({ token: jwt })),   // AuthPayload
-};
-ws.send(JSON.stringify(authFrame));
+  body: btoa(JSON.stringify({ token: jwt })) // AuthPayload
+}
+ws.send(JSON.stringify(authFrame))
 ```
 
 AUTH_ACK 帧 ( `messageId` 与请求一致 ) 的 body 解码后:
@@ -141,31 +141,31 @@ AUTH_ACK 帧 ( `messageId` 与请求一致 ) 的 body 解码后:
 // 建议 30s 一次, 网关原样回显同一帧作为 pong。
 // 心跳同时刷新该连接在服务端路由中的存活状态, 不发心跳的连接会被路由淘汰。
 const heartbeat = {
-  commandType: "COMMAND_TYPE_HEARTBEAT",
+  commandType: 'COMMAND_TYPE_HEARTBEAT',
   messageId: ulid(),
-  body: "",
-};
-ws.send(JSON.stringify(heartbeat));
+  body: ''
+}
+ws.send(JSON.stringify(heartbeat))
 ```
 
 心跳帧 body 为空。回显帧与发送帧完全一致, 可直接比对 `messageId`。
 
 ## 5. 指令一览
 
-| 指令 | 方向 | body ( 解码后 ) | 说明 |
-|---|---|---|---|
-| `HEARTBEAT` | C → G ( 回显 ) | 空 | 心跳 |
-| `AUTH` | C → G | `{"token": "..."}` | 首帧鉴权 |
-| `AUTH_ACK` | G → C | `{"success": bool, "errorMessage": "..."}` | 鉴权应答 |
-| `UPSTREAM` | C → G | 业务自定义 | 上行业务消息 |
-| `UPSTREAM_ACK` | G → C | `{"isSuccess": bool, "timestampMs": 123, "errorMessage": "..."}` | 网关级接收回执 |
-| `SYNC` | C → G | `{"cursor": 42, "limit": 100}` | 收件箱增量同步 |
-| `SYNC_ACK` | G → C | `{"isSuccess": bool, "errorMessage": "...", "response": {...}}` | 同步应答 |
-| `CONVERSATION_SYNC` | C → G | `{"conversationId": "...", "cursor": 7, "limit": 100}` | 会话 timeline 同步 ( 大群 ) |
-| `CONVERSATION_SYNC_ACK` | G → C | `{"isSuccess": bool, "errorMessage": "...", "response": {...}}` | 会话同步应答 |
-| `NOTIFY` | G → C | `{"latestSeq": 100}` | 服务端通知, 触发同步 |
-| `REDIRECT` | G → C | 空 ( 预留 ) | 重定向 ( 当前版本不会下发 ) |
-| `RATE_LIMIT_EXCEEDED` | G → C | 空 ( 预留 ) | 限流提示 ( 当前版本不会下发 ) |
+| 指令                    | 方向           | body ( 解码后 )                                                  | 说明                          |
+| ----------------------- | -------------- | ---------------------------------------------------------------- | ----------------------------- |
+| `HEARTBEAT`             | C → G ( 回显 ) | 空                                                               | 心跳                          |
+| `AUTH`                  | C → G          | `{"token": "..."}`                                               | 首帧鉴权                      |
+| `AUTH_ACK`              | G → C          | `{"success": bool, "errorMessage": "..."}`                       | 鉴权应答                      |
+| `UPSTREAM`              | C → G          | 业务自定义                                                       | 上行业务消息                  |
+| `UPSTREAM_ACK`          | G → C          | `{"isSuccess": bool, "timestampMs": 123, "errorMessage": "..."}` | 网关级接收回执                |
+| `SYNC`                  | C → G          | `{"cursor": 42, "limit": 100}`                                   | 收件箱增量同步                |
+| `SYNC_ACK`              | G → C          | `{"isSuccess": bool, "errorMessage": "...", "response": {...}}`  | 同步应答                      |
+| `CONVERSATION_SYNC`     | C → G          | `{"conversationId": "...", "cursor": 7, "limit": 100}`           | 会话 timeline 同步 ( 大群 )   |
+| `CONVERSATION_SYNC_ACK` | G → C          | `{"isSuccess": bool, "errorMessage": "...", "response": {...}}`  | 会话同步应答                  |
+| `NOTIFY`                | G → C          | `{"latestSeq": 100}`                                             | 服务端通知, 触发同步          |
+| `REDIRECT`              | G → C          | 空 ( 预留 )                                                      | 重定向 ( 当前版本不会下发 )   |
+| `RATE_LIMIT_EXCEEDED`   | G → C          | 空 ( 预留 )                                                      | 限流提示 ( 当前版本不会下发 ) |
 
 ## 6. 发送消息 ( UPSTREAM )
 
@@ -184,15 +184,17 @@ ws.send(JSON.stringify(heartbeat));
 
 ```typescript
 const upstream = {
-  commandType: "COMMAND_TYPE_UPSTREAM",
+  commandType: 'COMMAND_TYPE_UPSTREAM',
   messageId: ulid(),
-  body: btoa(JSON.stringify({
-    conversationId: "conv_1001",
-    content: "hello",
-    // ... 业务自定义字段, 网关与后端均不解释
-  })),
-};
-ws.send(JSON.stringify(upstream));
+  body: btoa(
+    JSON.stringify({
+      conversationId: 'conv_1001',
+      content: 'hello'
+      // ... 业务自定义字段, 网关与后端均不解释
+    })
+  )
+}
+ws.send(JSON.stringify(upstream))
 ```
 
 **UPSTREAM_ACK 的语义 ( 重要 )**:
@@ -209,8 +211,8 @@ ws.send(JSON.stringify(upstream));
   npm install ulid
   ```
   ```typescript
-  import { ulid } from "ulid";
-  const messageId = ulid();
+  import { ulid } from 'ulid'
+  const messageId = ulid()
   ```
 - 网关按 `( 账号, message_id )` 做 **10 秒窗口**去重: 窗口内同一 `messageId`
   的 UPSTREAM 重复帧会被丢弃, 这是 at-least-once 链路的第一层幂等。
@@ -231,7 +233,7 @@ ws.send(JSON.stringify(upstream));
 ```typescript
 if (notify.latestSeq > localCursor) {
   // 游标落后 → 拉取增量
-  sync(notify.latestSeq);
+  sync(notify.latestSeq)
 }
 // latestSeq <= localCursor → 忽略 ( 通知可能重复 )
 ```
@@ -243,14 +245,16 @@ if (notify.latestSeq > localCursor) {
 
 ```typescript
 const sync = {
-  commandType: "COMMAND_TYPE_SYNC",
+  commandType: 'COMMAND_TYPE_SYNC',
   messageId: ulid(),
-  body: btoa(JSON.stringify({
-    cursor: localCursor,  // 本端已应用的最大收件箱 seq; 首次/新设备传 0
-    limit: 100,           // 单页上限; 0 用服务端默认
-  })),
-};
-ws.send(JSON.stringify(sync));
+  body: btoa(
+    JSON.stringify({
+      cursor: localCursor, // 本端已应用的最大收件箱 seq; 首次/新设备传 0
+      limit: 100 // 单页上限; 0 用服务端默认
+    })
+  )
+}
+ws.send(JSON.stringify(sync))
 ```
 
 SYNC_ACK 的 body ( 成功时 ) 解码后:
@@ -287,14 +291,14 @@ SYNC_ACK 的 body ( 成功时 ) 解码后:
 
 字段语义:
 
-| 字段 | 说明 |
-|---|---|
-| `entries[].seq` | 该条目在你收件箱中的序号, **严格单调递增**, 以此去重并推进游标 |
-| `entries[].message` | 写扩散条目 ( 单聊/小群 ): 消息本体**内联**在此, 一次拉取即可渲染; `body` 仍是 base64 业务 JSON |
-| `entries[].conversationUpdate` | 读扩散指针 ( 大群 ): 只告诉你该会话有更新, 需再发 `CONVERSATION_SYNC` 拉正文 |
-| `latestSeq` | 服务端收件箱当前最大 seq |
-| `hasMore` | 为 `true` 时带新游标继续翻页 |
-| `cursorExpired` | 为 `true` 表示本地数据早于服务端保留窗口, **应重置本地消息数据后重新全量同步** |
+| 字段                           | 说明                                                                                           |
+| ------------------------------ | ---------------------------------------------------------------------------------------------- |
+| `entries[].seq`                | 该条目在你收件箱中的序号, **严格单调递增**, 以此去重并推进游标                                 |
+| `entries[].message`            | 写扩散条目 ( 单聊/小群 ): 消息本体**内联**在此, 一次拉取即可渲染; `body` 仍是 base64 业务 JSON |
+| `entries[].conversationUpdate` | 读扩散指针 ( 大群 ): 只告诉你该会话有更新, 需再发 `CONVERSATION_SYNC` 拉正文                   |
+| `latestSeq`                    | 服务端收件箱当前最大 seq                                                                       |
+| `hasMore`                      | 为 `true` 时带新游标继续翻页                                                                   |
+| `cursorExpired`                | 为 `true` 表示本地数据早于服务端保留窗口, **应重置本地消息数据后重新全量同步**                 |
 
 客户端处理流程:
 
@@ -317,14 +321,16 @@ if hasMore: 用返回的最大 seq 作为 cursor 继续翻页
 
 ```typescript
 const convSync = {
-  commandType: "COMMAND_TYPE_CONVERSATION_SYNC",
+  commandType: 'COMMAND_TYPE_CONVERSATION_SYNC',
   messageId: ulid(),
-  body: btoa(JSON.stringify({
-    conversationId: "conv_9001",
-    cursor: localConversationCursor,  // 本端已应用的该会话最大 seq, 首次传 0
-    limit: 100,
-  })),
-};
+  body: btoa(
+    JSON.stringify({
+      conversationId: 'conv_9001',
+      cursor: localConversationCursor, // 本端已应用的该会话最大 seq, 首次传 0
+      limit: 100
+    })
+  )
+}
 ```
 
 CONVERSATION_SYNC_ACK 的 `response`:
@@ -336,7 +342,13 @@ CONVERSATION_SYNC_ACK 的 `response`:
     "messages": [
       {
         "conversationSeq": 88,
-        "message": { "conversationId": "conv_9001", "messageId": "...", "senderId": 200, "body": "...", "sentAt": "..." }
+        "message": {
+          "conversationId": "conv_9001",
+          "messageId": "...",
+          "senderId": 200,
+          "body": "...",
+          "sentAt": "..."
+        }
       }
     ],
     "latestSeq": 88,
@@ -353,36 +365,36 @@ CONVERSATION_SYNC_ACK 的 `response`:
 
 所有 `*_ACK` 帧通过 `messageId` 与请求帧关联。通用处理:
 
-| 情况 | 处理建议 |
-|---|---|
-| 迟迟未收到 ACK ( 建议 5s 超时 ) | UPSTREAM: 可原 `messageId` 重试 ( 10s 去重窗口内网关会幂等消化 ); SYNC: 直接重发 |
-| `isSuccess: false` + `errorMessage` 含 `failed to sync` / `timeout` | 后端暂不可用, 退避后重试 |
-| 连接断开 | 走 [重连策略](#10-断线重连), 重连成功后**立即主动 SYNC 一次** ( 不等通知 ) |
+| 情况                                                                | 处理建议                                                                         |
+| ------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| 迟迟未收到 ACK ( 建议 5s 超时 )                                     | UPSTREAM: 可原 `messageId` 重试 ( 10s 去重窗口内网关会幂等消化 ); SYNC: 直接重发 |
+| `isSuccess: false` + `errorMessage` 含 `failed to sync` / `timeout` | 后端暂不可用, 退避后重试                                                         |
+| 连接断开                                                            | 走 [重连策略](#10-断线重连), 重连成功后**立即主动 SYNC 一次** ( 不等通知 )       |
 
 ## 10. 断线重连
 
 ```typescript
 class GatewayClient {
-  private reconnectAttempts = 0;
+  private reconnectAttempts = 0
 
   async connect() {
-    this.ws = new WebSocket(this.url);
+    this.ws = new WebSocket(this.url)
     this.ws.onopen = () => {
-      this.reconnectAttempts = 0;
-      this.auth(this.jwt);                 // 每次连接都必须重新 AUTH
-    };
-    this.ws.onclose = (ev) => this.scheduleReconnect();
-    this.ws.onmessage = (ev) => this.handleFrame(JSON.parse(ev.data));
+      this.reconnectAttempts = 0
+      this.auth(this.jwt) // 每次连接都必须重新 AUTH
+    }
+    this.ws.onclose = (ev) => this.scheduleReconnect()
+    this.ws.onmessage = (ev) => this.handleFrame(JSON.parse(ev.data))
   }
 
   private scheduleReconnect() {
     // 指数退避 + 抖动: 1s, 2s, 4s, ... 上限 30s
-    const delay = Math.min(30000, 1000 * 2 ** this.reconnectAttempts++);
-    const jitter = Math.random() * 500;
+    const delay = Math.min(30000, 1000 * 2 ** this.reconnectAttempts++)
+    const jitter = Math.random() * 500
     setTimeout(() => {
       // token 过期则先向后端换新 token 再连
-      this.connect().then(() => this.sync(0));   // 重连后立即全量比对游标
-    }, delay + jitter);
+      this.connect().then(() => this.sync(0)) // 重连后立即全量比对游标
+    }, delay + jitter)
   }
 }
 ```
@@ -397,150 +409,150 @@ class GatewayClient {
 
 ## 11. 推荐的客户端状态
 
-| 状态 | 类型 | 说明 |
-|---|---|---|
-| `cursor` | number | 收件箱全局游标 ( SYNC 推进 ) |
-| `conversationCursors` | `Record<conversationId, number>` | 各会话独立游标 ( CONVERSATION_SYNC 推进 ) |
-| `dedupCache` | `Set<messageId>` ( LRU ) | 渲染层按 `message_id` 幂等 |
-| `pendingAcks` | `Map<messageId, {frame, sentAt}>` | 超时重发与诊断 |
+| 状态                  | 类型                              | 说明                                      |
+| --------------------- | --------------------------------- | ----------------------------------------- |
+| `cursor`              | number                            | 收件箱全局游标 ( SYNC 推进 )              |
+| `conversationCursors` | `Record<conversationId, number>`  | 各会话独立游标 ( CONVERSATION_SYNC 推进 ) |
+| `dedupCache`          | `Set<messageId>` ( LRU )          | 渲染层按 `message_id` 幂等                |
+| `pendingAcks`         | `Map<messageId, {frame, sentAt}>` | 超时重发与诊断                            |
 
 ## 12. 完整最小示例 ( TypeScript )
 
 ```typescript
-import { ulid } from "ulid";
+import { ulid } from 'ulid'
 
 interface Frame {
-  commandType: string;
-  messageId: string;
-  body: string;
+  commandType: string
+  messageId: string
+  body: string
 }
 
-const encode = (payload: unknown) => btoa(JSON.stringify(payload));
-const decode = <T>(b: string): T => JSON.parse(atob(b));
+const encode = (payload: unknown) => btoa(JSON.stringify(payload))
+const decode = <T>(b: string): T => JSON.parse(atob(b))
 
 interface SyncEntry {
-  seq: number;
-  message?: { messageId: string; conversationId: string; body: string };
-  conversationUpdate?: { conversationId: string; conversationLatestSeq: number };
+  seq: number
+  message?: { messageId: string; conversationId: string; body: string }
+  conversationUpdate?: { conversationId: string; conversationLatestSeq: number }
 }
 
 interface SyncAck {
-  isSuccess: boolean;
-  errorMessage?: string;
-  response?: { entries: SyncEntry[]; latestSeq: number; hasMore: boolean; cursorExpired: boolean };
+  isSuccess: boolean
+  errorMessage?: string
+  response?: { entries: SyncEntry[]; latestSeq: number; hasMore: boolean; cursorExpired: boolean }
 }
 
 class SynpClient {
-  private ws!: WebSocket;
-  private cursor = 0;
-  private conversationCursors: Record<string, number> = {};
+  private ws!: WebSocket
+  private cursor = 0
+  private conversationCursors: Record<string, number> = {}
   // 请求-应答关联表: messageId → 应答回调
-  private pending = new Map<string, (frame: Frame) => void>();
+  private pending = new Map<string, (frame: Frame) => void>()
 
   constructor(
     private url: string,
-    private getJwt: () => Promise<string>,
+    private getJwt: () => Promise<string>
   ) {}
 
   async connect() {
-    this.ws = new WebSocket(this.url);
-    this.ws.onmessage = (ev) => this.onFrame(JSON.parse(ev.data) as Frame);
+    this.ws = new WebSocket(this.url)
+    this.ws.onmessage = (ev) => this.onFrame(JSON.parse(ev.data) as Frame)
     await new Promise<void>((resolve, reject) => {
-      this.ws.onopen = () => resolve();
-      this.ws.onerror = () => reject(new Error("connect failed"));
-    });
+      this.ws.onopen = () => resolve()
+      this.ws.onerror = () => reject(new Error('connect failed'))
+    })
 
     // ① 首帧 AUTH
-    const jwt = await this.getJwt();
-    const ack = await this.request("COMMAND_TYPE_AUTH", { token: jwt });
+    const jwt = await this.getJwt()
+    const ack = await this.request('COMMAND_TYPE_AUTH', { token: jwt })
     if (!decode<{ success: boolean }>(ack.body).success) {
-      throw new Error("auth failed");
+      throw new Error('auth failed')
     }
 
     // ② 心跳 ( 30s 一次; 生产实现建议加"连续 N 次无回显即重连"的看门狗 )
-    setInterval(() => this.send("COMMAND_TYPE_HEARTBEAT", {}), 30_000);
+    setInterval(() => this.send('COMMAND_TYPE_HEARTBEAT', {}), 30_000)
 
     // ③ 首次同步 ( 以本地持久化的游标为起点 )
-    await this.sync();
+    await this.sync()
   }
 
   /** 发送请求帧并等待同 messageId 的 ACK。 */
   private request(commandType: string, payload: unknown): Promise<Frame> {
     return new Promise((resolve) => {
-      const messageId = this.send(commandType, payload);
-      this.pending.set(messageId, resolve);
+      const messageId = this.send(commandType, payload)
+      this.pending.set(messageId, resolve)
       // 生产实现: 此处加超时定时器, 超时 reject 或按策略重发
-    });
+    })
   }
 
   private send(commandType: string, payload: unknown): string {
-    const messageId = ulid();
-    this.ws.send(JSON.stringify({ commandType, messageId, body: encode(payload) } as Frame));
-    return messageId;
+    const messageId = ulid()
+    this.ws.send(JSON.stringify({ commandType, messageId, body: encode(payload) } as Frame))
+    return messageId
   }
 
   private onFrame(frame: Frame) {
-    if (frame.commandType.endsWith("_ACK")) {
-      this.pending.get(frame.messageId)?.(frame);
-      this.pending.delete(frame.messageId);
-      return;
+    if (frame.commandType.endsWith('_ACK')) {
+      this.pending.get(frame.messageId)?.(frame)
+      this.pending.delete(frame.messageId)
+      return
     }
 
     switch (frame.commandType) {
-      case "COMMAND_TYPE_NOTIFY": {
-        const { latestSeq } = decode<{ latestSeq: number }>(frame.body);
-        if (latestSeq > this.cursor) void this.sync();
-        break;
+      case 'COMMAND_TYPE_NOTIFY': {
+        const { latestSeq } = decode<{ latestSeq: number }>(frame.body)
+        if (latestSeq > this.cursor) void this.sync()
+        break
       }
-      case "COMMAND_TYPE_HEARTBEAT":
-        break; // 回显, 忽略
+      case 'COMMAND_TYPE_HEARTBEAT':
+        break // 回显, 忽略
     }
   }
 
   private async sync() {
-    const ack = await this.request("COMMAND_TYPE_SYNC", { cursor: this.cursor, limit: 100 });
-    const payload = decode<SyncAck>(ack.body);
-    if (!payload.isSuccess || !payload.response) return;
+    const ack = await this.request('COMMAND_TYPE_SYNC', { cursor: this.cursor, limit: 100 })
+    const payload = decode<SyncAck>(ack.body)
+    if (!payload.isSuccess || !payload.response) return
 
     if (payload.response.cursorExpired) {
       // 本地数据早于服务端保留窗口: 重置后重建 ( 见 FAQ )
-      this.cursor = 0;
+      this.cursor = 0
     }
 
     for (const entry of payload.response.entries) {
-      if (entry.seq <= this.cursor) continue; // 幂等去重
+      if (entry.seq <= this.cursor) continue // 幂等去重
       if (entry.message) {
-        this.renderMessage(entry.message);
+        this.renderMessage(entry.message)
       }
       if (entry.conversationUpdate) {
-        const cu = entry.conversationUpdate;
+        const cu = entry.conversationUpdate
         if (cu.conversationLatestSeq > (this.conversationCursors[cu.conversationId] ?? 0)) {
-          void this.syncConversation(cu.conversationId);
+          void this.syncConversation(cu.conversationId)
         }
       }
-      this.cursor = entry.seq; // 推进收件箱游标
+      this.cursor = entry.seq // 推进收件箱游标
     }
 
-    if (payload.response.hasMore) await this.sync(); // 继续翻页
+    if (payload.response.hasMore) await this.sync() // 继续翻页
   }
 
   private async syncConversation(conversationId: string) {
-    const cursor = this.conversationCursors[conversationId] ?? 0;
-    const ack = await this.request("COMMAND_TYPE_CONVERSATION_SYNC", {
+    const cursor = this.conversationCursors[conversationId] ?? 0
+    const ack = await this.request('COMMAND_TYPE_CONVERSATION_SYNC', {
       conversationId,
       cursor,
-      limit: 100,
-    });
+      limit: 100
+    })
     const payload = decode<{
-      isSuccess: boolean;
-      response?: { messages: Array<{ conversationSeq: number; message: { messageId: string; body: string } }> };
-    }>(ack.body);
-    if (!payload.isSuccess || !payload.response) return;
+      isSuccess: boolean
+      response?: { messages: Array<{ conversationSeq: number; message: { messageId: string; body: string } }> }
+    }>(ack.body)
+    if (!payload.isSuccess || !payload.response) return
 
     for (const { conversationSeq, message } of payload.response.messages) {
-      if (conversationSeq <= cursor) continue; // 会话内幂等去重
-      this.renderMessage(message);
-      this.conversationCursors[conversationId] = conversationSeq;
+      if (conversationSeq <= cursor) continue // 会话内幂等去重
+      this.renderMessage(message)
+      this.conversationCursors[conversationId] = conversationSeq
     }
   }
 

@@ -1,0 +1,7 @@
+{
+  "extends": ["stylelint-config-standard"],
+  "ignoreFiles": ["out/**", "dist/**", "release/**", "node_modules/**"],
+  "rules": {
+    "import-notation": "string"
+  }
+}

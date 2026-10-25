@@ -1,0 +1,30 @@
+:root {
+  /* 主色 ( QQ NT 蓝 ) */
+  --nt-primary: #09f;
+  --nt-primary-hover: #0090f0;
+
+  /* 背景 */
+  --nt-bg-window: #f2f3f5;
+  --nt-bg-rail: #ebedf0;
+  --nt-bg-card: #fff;
+
+  /* 交互态 */
+  --nt-hover-bg: rgb(0 0 0 / 5%);
+  --nt-selected-bg: #dfe1e6;
+  --nt-pinned-bg: #e7e9ed;
+  --nt-pinned-hover-bg: #e0e3e8;
+  --nt-search-bg: rgb(0 0 0 / 5%);
+  --nt-disabled-bg: #e5e6eb;
+
+  /* 文本 */
+  --nt-text-primary: #1f2329;
+  --nt-text-secondary: #51565d;
+  --nt-text-tertiary: #8f959e;
+
+  /* 其他 */
+  --nt-divider: #e5e6eb;
+  --nt-badge: #fa5151;
+  --nt-bubble-self: #09f;
+  --nt-bubble-other: #fff;
+  --nt-avatar-fallback-bg: #8fb6d9;
+}

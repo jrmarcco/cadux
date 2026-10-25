@@ -1,0 +1,34 @@
+.search-input {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 6px;
+  background: var(--nt-search-bg);
+  transition: box-shadow 0.12s ease;
+
+  &:focus-within {
+    background: var(--nt-bg-card);
+    box-shadow: 0 0 0 1.5px var(--nt-primary);
+  }
+}
+
+.icon {
+  flex-shrink: 0;
+  color: var(--nt-text-tertiary);
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 13px;
+  color: var(--nt-text-primary);
+
+  &::placeholder {
+    color: var(--nt-text-tertiary);
+  }
+}

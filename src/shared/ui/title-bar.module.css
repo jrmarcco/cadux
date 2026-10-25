@@ -1,0 +1,60 @@
+.title-bar {
+  position: relative;
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  height: 36px;
+  background: transparent;
+  -webkit-app-region: drag;
+  user-select: none;
+}
+
+.drag-area {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  min-width: 0;
+  height: 100%;
+  padding-left: 12px;
+}
+
+.title {
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--nt-text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.controls {
+  display: flex;
+  align-items: stretch;
+  height: 100%;
+  -webkit-app-region: no-drag;
+}
+
+.control-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  border: none;
+  background: transparent;
+  color: var(--nt-text-secondary);
+  cursor: default;
+  outline: none;
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.control-button:hover {
+  background-color: var(--nt-hover-bg);
+  color: var(--nt-text-primary);
+}
+
+.close-button:hover {
+  background-color: #e81123;
+  color: #fff;
+}
